@@ -24,10 +24,10 @@ def carregar_dados():
 
 def salvar_dados(dados):
     if len(dados) == 0:
-        df = pd.DataFrame(columns=["Data", "Débito", "Crédito", "Valor", "Histórico"])
+        df = pd.DataFrame(columns=["Nº Lançamento","Data", "Débito", "Crédito", "Valor", "Histórico"])
     else:
         df = pd.DataFrame(dados)
-        df = df[["Data", "Débito", "Crédito", "Valor", "Histórico"]]
+        df = df[["Nº Lançamento","Data", "Débito", "Crédito", "Valor", "Histórico"]]
     
     # Atualiza a planilha na nuvem de forma definitiva
     conn.update(data=df)
