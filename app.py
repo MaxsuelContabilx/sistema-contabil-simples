@@ -52,10 +52,6 @@ def salvar_dados(dados):
             })
         df = pd.DataFrame(dados_planilha)
         df = df[colunas_oficiais]
-    
-    # SALVAMENTO LOCAL TEMPORÁRIO (Garante que o app não trava se a nuvem falhar)
-    # Como o link público do Google só aceita LEITURA fácil, para ESCRITA sem senhas complexas, 
-    # o ideal é manter os dados salvos na própria sessão do Streamlit Cloud
     pass
 
 # Inicializa o estado do livro diário buscando os dados atuais da sua planilha
@@ -71,7 +67,12 @@ def formatar_br(valor):
         return "R$ 0,00"
 
 # --- CONTROLADOR DE NAVEGAÇÃO INTERNA ---
-opcoes_menu = ["🏠 Menu Principal", "💻 Módulo Contábil", "🧮 Simulador Simples Nacional"]
+opcoes_menu = [
+    "🏠 Menu Principal", 
+    "💻 Módulo Contábil", 
+    "🧮 Simulador Simples Nacional",
+    "📋 Módulo de Folha & Fator R"
+]
 
 if 'pagina_selecionada' not in st.session_state:
     st.session_state.pagina_selecionada = "🏠 Menu Principal"
@@ -160,11 +161,11 @@ if st.session_state.pagina_selecionada == "🏠 Menu Principal":
     st.markdown("Seja bem-vindo ao seu painel estratégico. Selecione abaixo a ferramenta que deseja operar:")
     st.write("")
     
-    col_card1, col_card2 = st.columns(2)
+    col_card1, col_card2, col_card3 = st.columns(3)
     
     with col_card1:
         st.markdown("""
-        <div style="background-color: #f0f4f8; padding: 25px; border-radius: 10px; border-left: 5px solid #0f2a4a; min-height: 180px;">
+        <div style="background-color: #f0f4f8; padding: 25px; border-radius: 10px; border-left: 5px solid #0f2a4a; min-height: 200px;">
             <h3 style="color: #0f2a4a; margin-top:0;">💻 Módulo Contábil Comercial</h3>
             <p style="color: #333;">Realize partidas dobradas do livro diário, gere relatórios de DRE e acompanhe o fechamento do seu Balanço Patrimonial em tempo real.</p>
         </div>
@@ -175,13 +176,24 @@ if st.session_state.pagina_selecionada == "🏠 Menu Principal":
             
     with col_card2:
         st.markdown("""
-        <div style="background-color: #fffde6; padding: 25px; border-radius: 10px; border-left: 5px solid #d4af37; min-height: 180px;">
+        <div style="background-color: #fffde6; padding: 25px; border-radius: 10px; border-left: 5px solid #d4af37; min-height: 200px;">
             <h3 style="color: #6b5300; margin-top:0;">🧮 Inteligência do Simples Nacional</h3>
             <p style="color: #333;">Simule e compare simultaneamente a carga tributária dos Anexos I, II, III, IV e V. Faça simulações e descubra o rateio exato por imposto.</p>
         </div>
         """, unsafe_allow_html=True)
         if st.button("Acessar Simulador Tributário ➡️", use_container_width=True, key="btn_simulador"):
             st.session_state.pagina_selecionada = "🧮 Simulador Simples Nacional"
+            st.rerun()
+
+    with col_card3:
+        st.markdown("""
+        <div style="background-color: #f3fcf2; padding: 25px; border-radius: 10px; border-left: 5px solid #2e7d32; min-height: 200px;">
+            <h3 style="color: #1b5e20; margin-top:0;">📋 Folha de Pagamento & Fator R</h3>
+            <p style="color: #333;">Calcule o salário líquido de funcionários para 2026 com regras de INSS/IRRF e monitore o enquadramento estratégico do Fator R.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Acessar Módulo de Folha ➡️", use_container_width=True, key="btn_folha_v"):
+            st.session_state.pagina_selecionada = "📋 Módulo de Folha & Fator R"
             st.rerun()
 
 # ==============================================================================
@@ -193,7 +205,6 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
     if sub_menu == "📝 Lançamentos":
         st.title("📝 Livro Diário de Lançamentos")
         
-        # --- SEÇÃO DE IMPORTAÇÃO DE ARQUIVOS ---
         st.subheader("📥 Importar Lançamentos via CSV")
         arquivo_upload = st.file_uploader("Selecione seu arquivo CSV exportado do Excel (Separado por ponto e vírgula)", type=["csv"])
         
@@ -246,7 +257,6 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
             df_diario = pd.DataFrame(st.session_state.livro_diario)
             df_exibicao = df_diario.copy()
             
-            # Garante que mapeia exatamente os nomes das colunas com acentos para a tela
             df_exibicao.columns = ["Nº Lançamento", "Data", "Débito", "Crédito", "Valor", "Histórico"]
             
             if "Valor" in df_exibicao.columns:
@@ -352,3 +362,121 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
             st.table(df_rateio_exibir)
         with col_graf2:
             st.bar_chart(df_rateio.set_index("Imposto"))
+
+# ==============================================================================
+# TELA 4: MÓDULO DE FOLHA & FATOR R (NOVA TELA ACESSADA)
+# ==============================================================================
+elif st.session_state.pagina_selecionada == "📋 Módulo de Folha & Fator R":
+    st.title("📋 Painel Estratégico de DP: Folha & Fator R")
+    
+    sub_aba_dp = st.radio("Escolha a Operação:", ["🔍 Análise do Fator R", "🧮 Simulador Prático de Salário Líquido (2026)"], horizontal=True)
+    st.divider()
+    
+    if sub_aba_dp == "🔍 Análise do Fator R":
+        st.subheader("Análise Preventiva do Fator R (Anexos III e V)")
+        st.markdown("Insira o histórico acumulado dos últimos 12 meses da empresa para projetar o enquadramento tributário.")
+        
+        col_f1, col_f2 = st.columns(2)
+        faturamento_acumulado = col_f1.number_input("Faturamento Bruto Acumulado (Últimos 12 meses):", min_value=0.00, value=100000.00, step=1000.00, format="%.2f")
+        folha_acumulada = col_f2.number_input("Massa Salarial / CPP / Pró-Labore (Últimos 12 meses):", min_value=0.00, value=30000.00, step=500.00, format="%.2f")
+        
+        if faturamento_acumulado > 0:
+            fator_r_calculado = (folha_acumulada / faturamento_acumulado) * 100
+            
+            st.metric("Fator R Apurado", f"{fator_r_calculado:.2f}%")
+            
+            ifator_r_calculado = fator_r_calculado
+            if ifator_r_calculado >= 28.0:
+                st.success("🟢 **Empresa Enquadrada no Anexo III!** Devido à proporção da folha ser maior ou igual a 28%, a tributação da prestação de serviços iniciará em **6%** em vez de 15,5%.")
+            else:
+                st.warning("🔴 **Empresa Enquadrada no Anexo V!** Como a proporção da folha está abaixo de 28%, a tributação iniciará na alíquota padrão de **15,50%**.")
+                
+            # Exibe barra visual de progresso até a meta de 28%
+            progresso = min(1.0, float(fator_r_calculado / 28.0))
+            st.progress(progresso, text=f"Proporção da meta legal (Mínimo 28%): {fator_r_calculado:.2f}% / 28,00%")
+        else:
+            st.info("Insira um valor de faturamento acumulado válido para calcular o Fator R.")
+            
+    elif sub_aba_dp == "🧮 Simulador Prático de Salário Líquido (2026)":
+        st.subheader("Simulador de Folha de Pagamento - Competência 2026")
+        st.markdown("Cálculo integrado com os novos tetos de INSS e deduções de IRRF trazidas pela Lei nº 15.270/2025.")
+        
+        salario_bruto = st.number_input("Informe o Salário Bruto / Pró-Labore do Trabalhador (R$):", min_value=0.00, value=6500.00, step=100.00, format="%.2f")
+        
+        # --- CÁLCULO DO INSS PROGRESSIVO 2026 ---
+        inss_desconto = 0.0
+        # Definição das faixas da imagem fornecida
+        faixas_inss = [
+            (1621.00, 0.075, 0.00),
+            (2902.84, 0.090, 24.32),
+            (4354.27, 0.120, 111.40),
+            (8475.55, 0.140, 198.49)
+        ]
+        
+        teto_inss = 8475.55
+        salario_calculo_inss = min(salario_bruto, teto_inss)
+        
+        # Lógica Progressiva de Enquadramento por Faixa
+        if salario_calculo_inss <= 1621.00:
+            inss_desconto = salario_calculo_inss * 0.075
+        elif salario_calculo_inss <= 2902.84:
+            inss_desconto = (salario_calculo_inss * 0.090) - 24.32
+        elif salario_calculo_inss <= 4354.27:
+            inss_desconto = (salario_calculo_inss * 0.120) - 111.40
+        else:
+            inss_desconto = (salario_calculo_inss * 0.140) - 198.49
+            
+        # --- CÁLCULO DO IRRF PROGRESSIVO 2026 COM REDUÇÃO ---
+        base_irrf = max(0.0, salario_bruto - inss_desconto)
+        
+        # Tabela Padrão Geral Histórica Simulada para 2026 (Base de Cálculo IRRF)
+        # Utilizando faixas convencionais apenas como referência para base de cálculo antes da dedução regional
+        irrf_bruto = 0.0
+        if base_irrf <= 2259.20:
+            irrf_bruto = 0.0
+        elif base_irrf <= 2826.65:
+            irrf_bruto = (base_irrf * 0.075) - 169.44
+        elif base_irrf <= 3751.05:
+            irrf_bruto = (base_irrf * 0.150) - 381.44
+        elif base_irrf <= 4664.68:
+            irrf_bruto = (base_irrf * 0.225) - 662.77
+        else:
+            irrf_bruto = (base_irrf * 0.275) - 896.00
+            
+        # --- REDUÇÃO MENSAL (LEI Nº 15.270/2025) conforme imagem ---
+        reducao_imposto = 0.0
+        rendimentos_tributaveis = base_irrf # Base líquida após INSS sujeita a retenção
+        
+        if rendimentos_tributaveis <= 5000.00:
+            # Até 5000,00 a redução é de até R$ 312,89 extinguindo o imposto devido
+            reducao_imposto = min(irrf_bruto, 312.89)
+        elif rendimentos_tributaveis <= 7350.00:
+            # Fórmula linear exata extraída da imagem fornecida: 978.62 - (0.133145 * rendimentos)
+            reducao_calculada = 978.62 - (0.133145 * rendimentos_tributaveis)
+            reducao_imposto = max(0.0, reducao_calculada)
+        else:
+            reducao_imposto = 0.0
+            
+        irrf_final = max(0.0, irrf_bruto - reducao_imposto)
+        salario_liquido = salario_bruto - inss_desconto - irrf_final
+        
+        # Exibição do Contracheque/Holerite Simulado
+        st.subheader("📋 Demonstrativo de Pagamento Emitido")
+        
+        df_holerite = pd.DataFrame([
+            {"Evento / Rubrica": "🟢 Salário Base / Bruto", "Tipo": "Provento", "Valor": formatar_br(salario_bruto)},
+            {"Evento / Rubrica": "🔴 Desconto INSS Previdenciário", "Tipo": "Desconto", "Valor": formatar_br(-inss_desconto)},
+            {"Evento / Rubrica": "⚪ Base de Cálculo Líquida para o IRRF", "Tipo": "Informativo", "Valor": formatar_br(base_irrf)},
+            {"Evento / Rubrica": "🔵 IRRF Calculado (Antes da Redução)", "Tipo": "Informativo", "Valor": formatar_br(irrf_bruto)},
+            {"Evento / Rubrica": "🟢 Redução de IRRF (Lei nº 15.270/2025)", "Tipo": "Benefício", "Valor": formatar_br(reducao_imposto)},
+            {"Evento / Rubrica": "🔴 Desconto IRRF Efetivo Retido", "Tipo": "Desconto", "Valor": formatar_br(-irrf_final)},
+            {"Evento / Rubrica": "💰 SALÁRIO LÍQUIDO A RECEBER", "Tipo": "Totalizador", "Valor": formatar_br(salario_liquido)},
+        ])
+        
+        st.table(df_holerite)
+        
+        # Cards Rápidos Informativos
+        col_c1, col_c2, col_c3 = st.columns(3)
+        col_c1.metric("Total Descontado", formatar_br(inss_desconto + irrf_final))
+        col_c2.metric("Alíquota Efetiva de INSS", f"{(inss_desconto / salario_bruto * 100) if salario_bruto > 0 else 0:.2f}%")
+        col_c3.metric("IRRF Retido Final", formatar_br(irrf_final))
