@@ -197,7 +197,8 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
                 "Débito": c_debito,    # Adicionado o acento para coincidir com a planilha
                 "Crédito": c_credito,  # Adicionado o acento para coincidir com a planilha
                 "Valor": valor,
-                "Histórico": historico # Adicionado o acento para coincidir com a planilha}
+                "Histórico": historico # Adicionado o acento para coincidir com a planilha
+                       }
                 st.session_state.livro_diario.append(novo)
                 salvar_dados(st.session_state.livro_diario)
                 st.success("Lançamento gravado com sucesso na nuvem!")
