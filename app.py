@@ -366,6 +366,7 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
 # ==============================================================================
 # TELA 4: MÓDULO DE FOLHA & FATOR R (NOVA TELA ACESSADA)
 # ==============================================================================
+# ==============================================================================
 elif st.session_state.pagina_selecionada == "📋 Módulo de Folha & Fator R":
     st.title("📋 Painel Estratégico de DP: Folha & Fator R")
     
@@ -411,6 +412,11 @@ elif st.session_state.pagina_selecionada == "📋 Módulo de Folha & Fator R":
         
         st.sidebar.subheader("🏖️ Opções de Férias")
         calcular_ferias = st.sidebar.checkbox("Simular Recibo de Férias?")
+        
+        dias_gozo = 30
+        abono_pecuniario = False
+        adianta_13 = False
+        liquido_ferias = 0.0
         
         if calcular_ferias:
             dias_gozo = st.sidebar.slider("Dias de Férias a Gozar:", min_value=10, max_value=30, value=30)
@@ -464,18 +470,15 @@ elif st.session_state.pagina_selecionada == "📋 Módulo de Folha & Fator R":
         if calcular_ferias:
             st.subheader("🏖️ Demonstrativo de Recibo de Férias")
             
-            # Ajuste de dias caso haja abono pecuniário (venda de 10 dias)
             dias_faturamento_ferias = 20 if abono_pecuniario else dias_gozo
             
             valor_ferias_gozadas = (salario_bruto / 30) * dias_faturamento_ferias
             terco_constitucional = valor_ferias_gozadas / 3
             
-            # Verbas indenizatórias (não incidem INSS/IRRF)
             valor_abono = (salario_bruto / 30) * 10 if abono_pecuniario else 0.0
             terco_abono = valor_abono / 3 if abono_pecuniario else 0.0
             adiantamento_13o_valor = (salario_bruto / 2) if adianta_13 else 0.0
             
-            # Base de cálculo de tributos sobre as férias gozadas
             base_tributavel_ferias = valor_ferias_gozadas + terco_constitucional
             
             inss_ferias = calcular_inss_2026(base_tributavel_ferias)
@@ -495,7 +498,7 @@ elif st.session_state.pagina_selecionada == "📋 Módulo de Folha & Fator R":
                 {"Evento / Rubrica": "🔴 Desconto IRRF sobre Férias", "Tipo": "Desconto", "Valor": formatar_br(-irrf_ferias)},
                 {"Evento / Rubrica": "💰 VALOR LÍQUIDO DE FÉRIAS A RECEBER", "Tipo": "Totalizador", "Valor": formatar_br(liquido_ferias)},
             ])
-            df_ferias = df_ferias[df_ferias["Valor"] != formatar_br(0.0)] # Remove linhas zeradas
+            df_ferias = df_ferias[df_ferias["Valor"] != formatar_br(0.0)]
             st.table(df_ferias)
 
         # --- FLUXO 2: CÁLCULO DA FOLHA DE PAGAMENTO MENSAL ---
@@ -505,13 +508,12 @@ elif st.session_state.pagina_selecionada == "📋 Módulo de Folha & Fator R":
         
         st.subheader("📋 Demonstrativo de Pagamento Mensal Emitido")
         
-        # Montagem dinâmica da tabela com os novos descontos de faltas/atrasos e dependentes
         linhas_holerite = [
             {"Evento / Rubrica": "🟢 Salário Base / Bruto", "Tipo": "Provento", "Valor": formatar_br(salario_bruto)}
         ]
         
         if valor_faltas > 0:
-            linhas_holerite.append({"Evento / Rubrica": "🔴 Desconto de Faltas Justificadas/Injustificadas", "Tipo": "Desconto", "Valor": formatar_br(-valor_faltas)})
+            linhas_holerite.append({"Evento / Rubrica": "🔴 Desconto de Faltas", "Tipo": "Desconto", "Valor": formatar_br(-valor_faltas)})
         if valor_atrasos > 0:
             linhas_holerite.append({"Evento / Rubrica": "🔴 Desconto de Atrasos / DSR", "Tipo": "Desconto", "Valor": formatar_br(-valor_atrasos)})
             
@@ -526,8 +528,22 @@ elif st.session_state.pagina_selecionada == "📋 Módulo de Folha & Fator R":
         df_holerite = pd.DataFrame(linhas_holerite)
         st.table(df_holerite)
         
-        # Cards Rápidos Informativos
-        col_c1, col_c2, col_c3 = st.columns(3)
-        col_c1.metric("Total Descontado (Folha)", formatar_br(inss_desconto + irrf_final + total_descontos_legais))
-        col_c2.metric("Alíquota Efetiva de INSS", f"{(inss_desconto / salario_sujeito_encargos * 100) if salario_sujeito_encargos > 0 else 0:.2f}%")
-        col_c3.metric("IRRF Retido Final", formatar_br(irrf_final))
+        # --- TOTALIZADOR CONSOLIDADO (SOMA DE MÊS + FÉRIAS) ---
+        if calcular_ferias:
+            st.divider()
+            st.subheader("💰 Resumo Consolidado de Recebimentos")
+            st.markdown("Valores acumulados que serão disponibilizados ao colaborador (Folha Mensal + Recibo de Férias):")
+            
+            total_liquido_geral = salario_liquido + liquido_ferias
+            
+            col_g1, col_g2, col_g3 = st.columns(3)
+            col_g1.metric("Salário Líquido Mensal", formatar_br(salario_liquido))
+            col_g2.metric("Líquido de Férias", formatar_br(liquido_ferias))
+            col_g3.metric("TOTAL LÍQUIDO CONSOLIDADO", formatar_br(total_liquido_geral), delta="Mês + Férias", delta_color="inverse")
+            st.divider()
+        else:
+            # Cards originais simplificados caso não simule férias
+            col_c1, col_c2, col_c3 = st.columns(3)
+            col_c1.metric("Total Descontado (Folha)", formatar_br(inss_desconto + irrf_final + total_descontos_legais))
+            col_c2.metric("Alíquota Efetiva de INSS", f"{(inss_desconto / salario_sujeito_encargos * 100) if salario_sujeito_encargos > 0 else 0:.2f}%")
+            col_c3.metric("IRRF Retido Final", formatar_br(irrf_final))
