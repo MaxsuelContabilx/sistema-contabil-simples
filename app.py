@@ -13,7 +13,7 @@ def carregar_dados():
         try:
             df = pd.read_csv(ARQUIVO_BANCO)
             # Garante que as colunas necessárias existam
-            if not df.empty and all(col in df.columns for col in ["Débito", "Crédito", "Valor"]):
+            if not df.empty and all(col in df.columns for col in ["Data", "Débito", "Crédito", "Valor", "Histórico"]):
                 return df.to_dict(orient="records")
         except:
             return []
@@ -85,7 +85,6 @@ REPARTICAO_IMPOSTOS = {
     "Anexo V - Serviços":   {"IRPJ": 0.250, "CSLL": 0.150, "COFINS": 0.1410, "PIS": 0.0305, "CPP": 0.2885, "ICMS": 0.0, "IPI": 0.0, "ISS": 0.140}
 }
 
-# FUNÇÃO MODIFICADA COM PROTEÇÃO CONTRA ATRIBUTOS NULOS/INCOMPATÍVEIS
 def calcular_saldos():
     saldos = {c: 0.0 for c in plano_de_contas}
     for l in st.session_state.livro_diario:
@@ -147,6 +146,31 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
 
     if sub_menu == "📝 Lançamentos":
         st.title("📝 Livro Diário de Lançamentos")
+        
+        # --- NOVO: SEÇÃO DE IMPORTAÇÃO DE ARQUIVOS ---
+        st.subheader("📥 Importar Lançamentos via CSV")
+        arquivo_upload = st.file_uploader("Selecione um arquivo CSV com as colunas: Data, Débito, Crédito, Valor, Histórico", type=["csv"])
+        
+        if arquivo_upload is not None:
+            try:
+                df_importado = pd.read_csv(arquivo_upload)
+                colunas_obrigatorias = ["Data", "Débito", "Crédito", "Valor", "Histórico"]
+                
+                # Validação das colunas exatamente iguais à imagem image_b2d023.png
+                if all(col in df_importado.columns for col in colunas_obrigatorias):
+                    if st.button("Confirmar Importação de Dados"):
+                        dados_novos = df_importado[colunas_obrigatorias].to_dict(orient="records")
+                        st.session_state.livro_diario.extend(dados_novos)
+                        salvar_dados(st.session_state.livro_diario)
+                        st.success(f"{len(dados_novos)} lançamentos importados com sucesso!")
+                        st.rerun()
+                else:
+                    st.error("Erro: O arquivo enviado não possui as colunas idênticas ao modelo (Data, Débito, Crédito, Valor, Histórico).")
+            except Exception as e:
+                st.error(f"Erro ao processar o arquivo: {e}")
+                
+        st.divider()
+
         with st.form("form_lancamento", clear_on_submit=True):
             col1, col2 = st.columns(2)
             data = col1.date_input("Data do Lançamento")
@@ -171,8 +195,9 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
                 df_exibicao["Valor"] = df_exibicao["Valor"].apply(formatar_br)
             st.dataframe(df_exibicao, use_container_width=True)
             
-            csv = df_diario.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Exportar Lançamentos para Excel/CSV", data=csv, file_name="lancamentos_contabeis.csv", mime="text/csv")
+            # Exportação estruturada idêntica ao formato esperado
+            csv = df_diario[["Data", "Débito", "Crédito", "Valor", "Histórico"]].to_csv(index=False).encode('utf-8')
+            st.download_button("📤 Exportar Lançamentos para Excel/CSV", data=csv, file_name="lancamentos_contabeis.csv", mime="text/csv")
         else:
             st.info("Nenhum lançamento realizado ainda neste período.")
 
