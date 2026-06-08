@@ -11,9 +11,11 @@ ARQUIVO_BANCO = "historico_lancamentos.csv"
 def carregar_dados():
     if os.path.exists(ARQUIVO_BANCO):
         try:
-            df = pd.read_csv(ARQUIVO_BANCO)
-            # Garante que as colunas necessárias existam
-            if not df.empty and all(col in df.columns for col in ["Data", "Débito", "Crédito", "Valor", "Histórico"]):
+            # Carrega usando ponto e vírgula e codificação correta para o Brasil
+            df = pd.read_csv(ARQUIVO_BANCO, sep=";", encoding="utf-8-sig")
+            # Força o nome das colunas sem acento para evitar bugs de codificação
+            df.columns = ["Data", "Debito", "Credito", "Valor", "Historico"]
+            if not df.empty:
                 return df.to_dict(orient="records")
         except:
             return []
@@ -21,7 +23,9 @@ def carregar_dados():
 
 def salvar_dados(dados):
     df = pd.DataFrame(dados)
-    df.to_csv(ARQUIVO_BANCO, index=False)
+    # Garante a ordem correta e salva compatível com Excel
+    df = df[["Data", "Debito", "Credito", "Valor", "Historico"]]
+    df.to_csv(ARQUIVO_BANCO, index=False, sep=";", encoding="utf-8-sig")
 
 if 'livro_diario' not in st.session_state:
     st.session_state.livro_diario = carregar_dados()
@@ -89,8 +93,8 @@ def calcular_saldos():
     saldos = {c: 0.0 for c in plano_de_contas}
     for l in st.session_state.livro_diario:
         try:
-            d = str(l.get("Débito", ""))
-            c = str(l.get("Crédito", ""))
+            d = str(l.get("Debito", ""))
+            c = str(l.get("Credito", ""))
             v = float(l.get("Valor", 0.0))
             
             if d in saldos:
@@ -147,16 +151,20 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
     if sub_menu == "📝 Lançamentos":
         st.title("📝 Livro Diário de Lançamentos")
         
-        # --- NOVO: SEÇÃO DE IMPORTAÇÃO DE ARQUIVOS ---
+        # --- SEÇÃO DE IMPORTAÇÃO DE ARQUIVOS (OTIMIZADA) ---
         st.subheader("📥 Importar Lançamentos via CSV")
-        arquivo_upload = st.file_uploader("Selecione um arquivo CSV com as colunas: Data, Débito, Crédito, Valor, Histórico", type=["csv"])
+        arquivo_upload = st.file_uploader("Selecione seu arquivo CSV exportado do Excel (Separado por ponto e vírgula)", type=["csv"])
         
         if arquivo_upload is not None:
             try:
-                df_importado = pd.read_csv(arquivo_upload)
-                colunas_obrigatorias = ["Data", "Débito", "Crédito", "Valor", "Histórico"]
+                # Lê tratando o separador do Excel nacional e acentuação
+                df_importado = pd.read_csv(arquivo_upload, sep=";", encoding="utf-8-sig")
                 
-                # Validação das colunas exatamente iguais à imagem image_b2d023.png
+                # Normaliza os nomes das colunas importadas tirando acentos para bater com o padrão
+                df_importado.columns = [col.replace("é", "e").replace("ó", "o").title() for col in df_importado.columns]
+                
+                colunas_obrigatorias = ["Data", "Debito", "Credito", "Valor", "Historico"]
+                
                 if all(col in df_importado.columns for col in colunas_obrigatorias):
                     if st.button("Confirmar Importação de Dados"):
                         dados_novos = df_importado[colunas_obrigatorias].to_dict(orient="records")
@@ -165,7 +173,7 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
                         st.success(f"{len(dados_novos)} lançamentos importados com sucesso!")
                         st.rerun()
                 else:
-                    st.error("Erro: O arquivo enviado não possui as colunas idênticas ao modelo (Data, Débito, Crédito, Valor, Histórico).")
+                    st.error("Erro: O arquivo precisa conter as colunas: Data, Debito, Credito, Valor, Historico.")
             except Exception as e:
                 st.error(f"Erro ao processar o arquivo: {e}")
                 
@@ -180,7 +188,7 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
             historico = st.text_input("Histórico / Descrição da Operação")
             
             if st.form_submit_button("Confirmar e Salvar Lançamento"):
-                novo = {"Data": str(data), "Débito": c_debito, "Crédito": c_credito, "Valor": valor, "Histórico": historico}
+                novo = {"Data": str(data), "Debito": c_debito, "Credito": c_credito, "Valor": valor, "Historico": historico}
                 st.session_state.livro_diario.append(novo)
                 salvar_dados(st.session_state.livro_diario)
                 st.success("Lançamento gravado com sucesso!")
@@ -191,12 +199,17 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
         if len(st.session_state.livro_diario) > 0:
             df_diario = pd.DataFrame(st.session_state.livro_diario)
             df_exibicao = df_diario.copy()
+            
+            # Ajusta os nomes apenas visualmente na tabela do sistema para ficar bonito
+            df_exibicao.columns = ["Data", "Débito", "Crédito", "Valor", "Histórico"]
             if "Valor" in df_exibicao.columns:
                 df_exibicao["Valor"] = df_exibicao["Valor"].apply(formatar_br)
             st.dataframe(df_exibicao, use_container_width=True)
             
-            # Exportação estruturada idêntica ao formato esperado
-            csv = df_diario[["Data", "Débito", "Crédito", "Valor", "Histórico"]].to_csv(index=False).encode('utf-8')
+            # Exportação estruturada ideal para o Excel do Brasil (sem acentos nos cabeçalhos para evitar erros)
+            df_exportar = df_diario[["Data", "Debito", "Credito", "Valor", "Historico"]].copy()
+            df_exportar.columns = ["Data", "Debito", "Credito", "Valor", "Historico"]
+            csv = df_exportar.to_csv(index=False, sep=";", encoding="utf-8-sig").encode('utf-8-sig')
             st.download_button("📤 Exportar Lançamentos para Excel/CSV", data=csv, file_name="lancamentos_contabeis.csv", mime="text/csv")
         else:
             st.info("Nenhum lançamento realizado ainda neste período.")
