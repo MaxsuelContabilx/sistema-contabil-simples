@@ -10,8 +10,13 @@ ARQUIVO_BANCO = "historico_lancamentos.csv"
 
 def carregar_dados():
     if os.path.exists(ARQUIVO_BANCO):
-        df = pd.read_csv(ARQUIVO_BANCO)
-        return df.to_dict(orient="records")
+        try:
+            df = pd.read_csv(ARQUIVO_BANCO)
+            # Garante que as colunas necessárias existam
+            if not df.empty and all(col in df.columns for col in ["Débito", "Crédito", "Valor"]):
+                return df.to_dict(orient="records")
+        except:
+            return []
     return []
 
 def salvar_dados(dados):
@@ -24,9 +29,7 @@ if 'livro_diario' not in st.session_state:
 # --- FUNÇÃO DE FORMATAÇÃO DE MOEDA PT-BR ---
 def formatar_br(valor):
     try:
-        # Formata com separador de milhar americano primeiro, depois troca de forma segura
         val_formatado = "{:,.2f}".format(valor)
-        # Substitui a vírgula por um caractere temporário, troca o ponto por vírgula e o temporário por ponto
         return "R$ " + val_formatado.replace(",", "X").replace(".", ",").replace("X", ".")
     except:
         return "R$ 0,00"
@@ -34,7 +37,6 @@ def formatar_br(valor):
 # --- CONTROLADOR DE NAVEGAÇÃO INTERNA ---
 opcoes_menu = ["🏠 Menu Principal", "💻 Módulo Contábil", "🧮 Simulador Simples Nacional"]
 
-# Controla a página de forma resiliente usando strings na sessão
 if 'pagina_selecionada' not in st.session_state:
     st.session_state.pagina_selecionada = "🏠 Menu Principal"
 
@@ -48,7 +50,6 @@ else:
 
 st.sidebar.divider()
 
-# Descobre o índice da página atual para manter o radio sincronizado
 try:
     idx_atual = opcoes_menu.index(st.session_state.pagina_selecionada)
 except ValueError:
@@ -56,30 +57,15 @@ except ValueError:
 
 opcao_menu = st.sidebar.radio("Navegação do Sistema", opcoes_menu, index=idx_atual, key="nav_radio")
 
-# Se o usuário clicar manualmente no menu lateral, atualiza o estado
 if opcao_menu != st.session_state.pagina_selecionada:
     st.session_state.pagina_selecionada = opcao_menu
     st.rerun()
 
 # --- PLANO DE CONTAS ---
 plano_de_contas = {
-    "1.01": "Caixa/Banco", 
-    "1.02": "Estoque",
-    "1.03": "Clientes a Receber",
-    "1.04": "Imobilizado",  # <--- Nova conta no Ativo
-    
-    "2.01": "Fornecedores", 
-    "2.03": "Capital Social", 
-    "2.04": "Lucros Acumulados",
-    "2.02": "Empréstimos Bancários", # <--- Nova conta no Passivo
-    
-    "4.01": "Receita de Vendas", 
-    
-    "5.01": "Despesas", 
-    "5.02": "Pró-Labore e Salários", # <--- Nova conta de Despesa
-    
-    "6.01": "Impostos", 
-    "7.01": "ARE"
+    "1.01": "Caixa/Banco", "1.02": "Imobilizado",
+    "2.01": "Fornecedores", "2.02": "Capital Social", "2.03": "Lucros Acumulados",
+    "4.01": "Receita de Vendas", "5.01": "Despesas", "6.01": "Impostos", "7.01": "ARE"
 }
 
 # TABELAS OFICIAIS DO SIMPLES NACIONAL
@@ -99,14 +85,23 @@ REPARTICAO_IMPOSTOS = {
     "Anexo V - Serviços":   {"IRPJ": 0.250, "CSLL": 0.150, "COFINS": 0.1410, "PIS": 0.0305, "CPP": 0.2885, "ICMS": 0.0, "IPI": 0.0, "ISS": 0.140}
 }
 
+# FUNÇÃO MODIFICADA COM PROTEÇÃO CONTRA ATRIBUTOS NULOS/INCOMPATÍVEIS
 def calcular_saldos():
     saldos = {c: 0.0 for c in plano_de_contas}
     for l in st.session_state.livro_diario:
-        d, c, v = l["Débito"], l["Crédito"], float(l["Valor"])
-        if d.startswith(('1', '5', '6')): saldos[d] += v
-        else: saldos[d] -= v
-        if c.startswith(('2', '4')): saldos[c] += v
-        else: saldos[c] -= v
+        try:
+            d = str(l.get("Débito", ""))
+            c = str(l.get("Crédito", ""))
+            v = float(l.get("Valor", 0.0))
+            
+            if d in saldos:
+                if d.startswith(('1', '5', '6')): saldos[d] += v
+                else: saldos[d] -= v
+            if c in saldos:
+                if c.startswith(('2', '4')): saldos[c] += v
+                else: saldos[c] -= v
+        except:
+            continue
     return saldos
 
 saldos = calcular_saldos()
@@ -171,25 +166,15 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
         st.subheader("📋 Registros Efetuados")
         if len(st.session_state.livro_diario) > 0:
             df_diario = pd.DataFrame(st.session_state.livro_diario)
-            
-            # Formatação PT-BR na exibição do dataframe
             df_exibicao = df_diario.copy()
-            df_exibicao["Valor"] = df_exibicao["Valor"].apply(formatar_br)
+            if "Valor" in df_exibicao.columns:
+                df_exibicao["Valor"] = df_exibicao["Valor"].apply(formatar_br)
             st.dataframe(df_exibicao, use_container_width=True)
             
             csv = df_diario.to_csv(index=False).encode('utf-8')
             st.download_button("📥 Exportar Lançamentos para Excel/CSV", data=csv, file_name="lancamentos_contabeis.csv", mime="text/csv")
         else:
             st.info("Nenhum lançamento realizado ainda neste período.")
-            
-        with st.expander("📂 Importar Lançamentos via Planilha"):
-            arquivo_enviado = st.file_uploader("Selecione um arquivo CSV com as colunas idênticas às de exportação", type=["csv"])
-            if arquivo_enviado is not None:
-                df_importado = pd.read_csv(arquivo_enviado)
-                st.session_state.livro_diario = df_importado.to_dict(orient="records")
-                salvar_dados(st.session_state.livro_diario)
-                st.success("Planilha importada com sucesso!")
-                st.rerun()
 
     elif sub_menu == "📊 DRE":
         st.title("📊 Demonstrativo de Resultado do Exercício (DRE)")
@@ -225,26 +210,12 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
 # ==============================================================================
 elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
     st.title("🧮 Super Simulador Comparativo do Simples Nacional")
-    st.write("Insira os parâmetros abaixo para analisar o impacto financeiro em cada um dos 5 anexos.")
     
     col_in1, col_in2 = st.columns(2)
     rbt12 = col_in1.number_input("Receita Acumulada nos últimos 12 meses (RBT12):", min_value=0.00, value=250000.00, format="%.2f")
     faturamento_mes = col_in2.number_input("Faturamento Estimado para o Mês Atual:", min_value=0.00, value=20000.00, format="%.2f")
     
     tabelas_calculo = {k: list(v) for k, v in TABELAS_PADRAO.items()}
-    with st.expander("🛠️ Modo Consultor: Alterar Alíquotas e Deduções Temporariamente"):
-        st.warning("As alterações abaixo são temporárias e duram apenas durante esta sessão.")
-        anexo_ajuste = st.selectbox("Escolha qual Anexo deseja customizar a faixa:", list(TABELAS_PADRAO.keys()))
-        
-        faixas_custom = []
-        for i, (limite, aliq, ded) in enumerate(TABELAS_PADRAO[anexo_ajuste]):
-            st.markdown(f"**Faixa {i+1} (Até {formatar_br(limite)})**")
-            c_aliq, c_ded = st.columns(2)
-            nova_aliq = c_aliq.number_input(f"Alíquota Nominal Faixa {i+1}", min_value=0.0, max_value=100.0, value=float(aliq*100), key=f"a_{anexo_ajuste}_{i}") / 100
-            nova_ded = c_ded.number_input(f"Parcela a Deduzir Faixa {i+1}", min_value=0.0, value=float(ded), key=f"d_{anexo_ajuste}_{i}")
-            faixas_custom.append((limite, nova_aliq, nova_ded))
-        tabelas_calculo[anexo_ajuste] = faixas_custom
-
     resultados = []
     detalhes_impostos = {}
 
@@ -280,8 +251,6 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
 
     st.subheader("📊 Painel Comparativo de Cenários")
     df_res = pd.DataFrame(resultados)
-    
-    # Aplica a formatação brasileira de dinheiro na coluna do Imposto Mensal
     df_res_exibir = df_res.copy()
     df_res_exibir["Imposto Mensal"] = df_res_exibir["Imposto Mensal"].apply(formatar_br)
     st.table(df_res_exibir)
