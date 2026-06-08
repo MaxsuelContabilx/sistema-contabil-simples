@@ -8,13 +8,18 @@ import copy
 st.set_page_config(page_title="Maxsuel Contabilidade - Gestão e Estratégia", layout="wide")
 
 # --- CONEXÃO INTELIGENTE COM O GOOGLE SHEETS ---
-# Intercepta as chaves de segurança e corrige formatações incorretas de quebra de linha antes de conectar
 try:
-    credenciais_dict = copy.deepcopy(dict(st.secrets["connections"]["gsheets"]))
-    if "private_key" in credenciais_dict:
-        credenciais_dict["private_key"] = credenciais_dict["private_key"].replace("\\n", "\n")
-    conn = st.connection("gsheets", type=GSheetsConnection, **credenciais_dict)
+    # Coleta os dados de forma limpa, tratando a chave privada diretamente como texto puro (raw string)
+    info_con = dict(st.secrets["connections"]["gsheets"])
+    
+    if "private_key" in info_con:
+        # Remove caracteres indesejados e garante que as quebras de linha sejam interpretadas nativamente
+        chave_limpa = str(info_con["private_key"]).strip().replace("\\n", "\n")
+        info_con["private_key"] = chave_limpa
+        
+    conn = st.connection("gsheets", type=GSheetsConnection, **info_con)
 except Exception as e:
+    # Backup padrão do Streamlit
     conn = st.connection("gsheets", type=GSheetsConnection)
 
 def carregar_dados():
