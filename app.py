@@ -15,22 +15,27 @@ def carregar_dados():
         df = conn.read(ttl="0s") # ttl="0s" limpa o cache para trazer dados sempre novos
         if df.empty:
             return []
-        # Garante as colunas corretas e limpas
-        df.columns = ["Débito", "Crédito", "Valor", "Histórico"]
+        
+        # ATENÇÃO: Mudamos para nomes padronizados sem acento para não quebrar o calcular_saldos()
+        df.columns = ["Nº Lançamento", "Data", "Debito", "Credito", "Valor", "Historico"]
         return df.to_dict(orient="records")
     except Exception as e:
-        # Se a planilha estiver totalmente vazia (sem cabeçalho ainda), retorna lista vazia
         return []
 
 def salvar_dados(dados):
     if len(dados) == 0:
-        df = pd.DataFrame(columns=["Nº Lançamento","Data", "Débito", "Crédito", "Valor", "Histórico"])
+        df = pd.DataFrame(columns=["Nº Lançamento", "Data", "Debito", "Credito", "Valor", "Historico"])
     else:
         df = pd.DataFrame(dados)
-        df = df[["Nº Lançamento","Data", "Débito", "Crédito", "Valor", "Histórico"]]
+        # Garante a ordem correta das colunas antes de enviar
+        df = df[["Nº Lançamento", "Data", "Debito", "Credito", "Valor", "Historico"]]
     
-    # Atualiza a planilha na nuvem de forma definitiva
-    conn.update(data=df)
+    # IMPORTANTE: Adicione o link da sua planilha para corrigir o erro da imagem image_a71c0b.png
+    # Substitua abaixo pelo link real da sua planilha se necessário, ou use o st.secrets
+    conn.update(
+        spreadsheet=st.secrets["connections"]["gsheets"]["spreadsheet"],
+        data=df
+    )
 
 # Inicializa o estado do livro diário buscando diretamente da nuvem
 if 'livro_diario' not in st.session_state:
@@ -192,13 +197,14 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
             historico = st.text_input("Histórico / Descrição da Operação")
             
             if st.form_submit_button("Confirmar e Salvar Lançamento"):
-                novo = {"Nº Lançamento": len(st.session_state.livro_diario) + 1,
-                "Data": str(data),
-                "Débito": c_debito,    # Adicionado o acento para coincidir com a planilha
-                "Crédito": c_credito,  # Adicionado o acento para coincidir com a planilha
-                "Valor": valor,
-                "Histórico": historico # Adicionado o acento para coincidir com a planilha
-                       }
+                novo = {
+                    "Nº Lançamento": len(st.session_state.livro_diario) + 1,
+                    "Data": str(data),
+                    "Debito": c_debito,     # Mantido sem acento
+                    "Credito": c_credito,   # Mantido sem acento
+                    "Valor": valor,
+                    "Historico": historico  # Mantido sem acento
+                }
                 st.session_state.livro_diario.append(novo)
                 salvar_dados(st.session_state.livro_diario)
                 st.success("Lançamento gravado com sucesso na nuvem!")
@@ -210,7 +216,9 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
             df_diario = pd.DataFrame(st.session_state.livro_diario)
             df_exibicao = df_diario.copy()
             
-            df_exibicao.columns = ["Nº Lançamento","Data", "Débito", "Crédito", "Valor", "Histórico"]
+            # Mapeia as colunas internas para nomes elegantes com acento na tela
+            df_exibicao.columns = ["Nº Lançamento", "Data", "Débito", "Crédito", "Valor", "Histórico"]
+            
             if "Valor" in df_exibicao.columns:
                 df_exibicao["Valor"] = df_exibicao["Valor"].apply(formatar_br)
             st.dataframe(df_exibicao, use_container_width=True)
