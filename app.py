@@ -16,7 +16,7 @@ def carregar_dados():
         if df.empty:
             return []
         # Garante as colunas corretas e limpas
-        df.columns = ["Debito", "Credito", "Valor", "Historico"]
+        df.columns = ["Débito", "Crédito", "Valor", "Histórico"]
         return df.to_dict(orient="records")
     except Exception as e:
         # Se a planilha estiver totalmente vazia (sem cabeçalho ainda), retorna lista vazia
@@ -24,10 +24,10 @@ def carregar_dados():
 
 def salvar_dados(dados):
     if len(dados) == 0:
-        df = pd.DataFrame(columns=["Data", "Debito", "Credito", "Valor", "Historico"])
+        df = pd.DataFrame(columns=["Data", "Débito", "Crédito", "Valor", "Histórico"])
     else:
         df = pd.DataFrame(dados)
-        df = df[["Data", "Debito", "Credito", "Valor", "Historico"]]
+        df = df[["Data", "Débito", "Crédito", "Valor", "Histórico"]]
     
     # Atualiza a planilha na nuvem de forma definitiva
     conn.update(data=df)
