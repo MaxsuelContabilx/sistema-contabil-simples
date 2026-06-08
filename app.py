@@ -11,51 +11,63 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 
 def carregar_dados():
     try:
-        # Lê os dados em tempo real da planilha configurada no secrets
-        df = conn.read(ttl="0s")
-        if df.empty:
+        # Lê os dados em tempo real da planilha configurada, especificando a aba "Página1"
+        df = conn.read(
+            spreadsheet=st.secrets["connections"]["gsheets"]["spreadsheet"],
+            worksheet="Página1",
+            ttl="0s"
+        )
+        
+        # Se a planilha estiver vazia ou não tiver linhas, retorna uma lista vazia
+        if df.empty or len(df) == 0:
             return []
+            
+        # Garante que os nomes das colunas lidos sejam limpos de espaços em branco
+        df.columns = [str(col).strip() for col in df.columns]
         
-        # Sincroniza os nomes exatos das colunas da sua imagem
-        df.columns = ["Nº Lançamento", "Data", "Débito", "Crédito", "Valor", "Histórico"]
-        
-        # Converte para uma lista de dicionários mudando internamente para chaves sem acento
-        # Isso garante que a sua função calcular_saldos() continue a funcionar sem sofrer com acentuação
+        # Converte a estrutura física (com acento) para a estrutura lógica da memória (sem acento)
+        # Isso evita os erros de KeyError no cálculo de saldos
         dados_formatados = []
         for row in df.to_dict(orient="records"):
             dados_formatados.append({
-                "Nº Lançamento": row["Nº Lançamento"],
-                "Data": row["Data"],
-                "Debito": row["Débito"],     # Remove acento para o cálculo interno
-                "Credito": row["Crédito"],   # Remove acento para o cálculo interno
-                "Valor": row["Valor"],
-                "Historico": row["Histórico"] # Remove acento para o cálculo interno
+                "Nº Lançamento": row.get("Nº Lançamento", len(dados_formatados) + 1),
+                "Data": row.get("Data", ""),
+                "Debito": row.get("Débito", ""),     # Sem acento para o cálculo interno
+                "Credito": row.get("Crédito", ""),   # Sem acento para o cálculo interno
+                "Valor": float(row.get("Valor", 0.0)) if row.get("Valor") else 0.0,
+                "Historico": row.get("Histórico", "") # Sem acento para o cálculo interno
             })
         return dados_formatados
     except Exception as e:
+        # Se der qualquer erro de leitura (ex: planilha sem colunas ainda), inicia o app zerado
         return []
 
 def salvar_dados(dados):
+    # Nomes exatos das colunas que aparecem na Linha 1 da sua planilha do Google
+    colunas_oficiais = ["Nº Lançamento", "Data", "Débito", "Crédito", "Valor", "Histórico"]
+    
     if len(dados) == 0:
-        df = pd.DataFrame(columns=["Nº Lançamento", "Data", "Débito", "Crédito", "Valor", "Histórico"])
+        df = pd.DataFrame(columns=colunas_oficiais)
     else:
-        # Reconverte a estrutura de memória para a estrutura física da folha com acentos
+        # Transforma os dados internos de volta para o formato físico com acentuação da planilha
         dados_planilha = []
         for d in dados:
             dados_planilha.append({
                 "Nº Lançamento": d.get("Nº Lançamento"),
                 "Data": d.get("Data"),
-                "Débito": d.get("Debito"),      # Devolve o acento antes de enviar
-                "Crédito": d.get("Credito"),    # Devolve o acento antes de enviar
+                "Débito": d.get("Debito"),      # Devolve o acento
+                "Crédito": d.get("Credito"),    # Devolve o acento
                 "Valor": d.get("Valor"),
-                "Histórico": d.get("Historico")  # Devolve o acento antes de enviar
+                "Histórico": d.get("Historico")  # Devolve o acento
             })
         df = pd.DataFrame(dados_planilha)
-        df = df[["Nº Lançamento", "Data", "Débito", "Crédito", "Valor", "Histórico"]]
+        # Força o DataFrame a ter as colunas na ordem exata da planilha
+        df = df[colunas_oficiais]
     
-    # Atualiza a planilha mapeada no secrets
+    # Atualiza a aba "Página1" da planilha de forma definitiva
     conn.update(
         spreadsheet=st.secrets["connections"]["gsheets"]["spreadsheet"],
+        worksheet="Página1",
         data=df
     )
 
