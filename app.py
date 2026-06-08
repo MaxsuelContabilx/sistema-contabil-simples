@@ -185,7 +185,7 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
         with st.form("form_lancamento", clear_on_submit=True):
             col1, col2 = st.columns(2)
             data = col1.date_input("Data do Lançamento")
-            valor = col2.number_input("Valor (R$)", min_value=0.01, format="%,.2f")
+            valor = col2.number_input("Valor (R$)", min_value=0.01, format="%.2f")
             
             c_debito = st.selectbox("Conta Débito (Entrada)", list(plano_de_contas.keys()), format_func=lambda x: f"{x} - {plano_de_contas[x]}")
             c_credito = st.selectbox("Conta Crédito (Origem)", list(plano_de_contas.keys()), format_func=lambda x: f"{x} - {plano_de_contas[x]}")
@@ -251,8 +251,8 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
     st.title("🧮 Super Simulador Comparativo do Simples Nacional")
     
     col_in1, col_in2 = st.columns(2)
-    rbt12 = col_in1.number_input("Receita Acumulada nos últimos 12 meses (RBT12):", min_value=0.00, value=250000.00, format="%,.2f")
-    faturamento_mes = col_in2.number_input("Faturamento Estimado para o Mês Atual:", min_value=0.00, value=20000.00, format="%,.2f")
+    rbt12 = col_in1.number_input("Receita Acumulada nos últimos 12 meses (RBT12):", min_value=0.00, value=250000.00, format="%.2f")
+    faturamento_mes = col_in2.number_input("Faturamento Estimado para o Mês Atual:", min_value=0.00, value=20000.00, format="%.2f")
     
     tabelas_calculo = {k: list(v) for k, v in TABELAS_PADRAO.items()}
     resultados = []
