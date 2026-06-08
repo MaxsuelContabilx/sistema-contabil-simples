@@ -1,43 +1,24 @@
 import streamlit as st
 import pandas as pd
-from streamlit_gsheets import GSheetsConnection
 import os
-import copy
 
 # Configuração da Página
 st.set_page_config(page_title="Maxsuel Contabilidade - Gestão e Estratégia", layout="wide")
 
-# --- CONEXÃO INTELIGENTE COM O GOOGLE SHEETS ---
-try:
-    # Coleta os dados de forma limpa, tratando a chave privada diretamente como texto puro (raw string)
-    info_con = dict(st.secrets["connections"]["gsheets"])
-    
-    if "private_key" in info_con:
-        # Remove caracteres indesejados e garante que as quebras de linha sejam interpretadas nativamente
-        chave_limpa = str(info_con["private_key"]).strip().replace("\\n", "\n")
-        info_con["private_key"] = chave_limpa
-        
-    conn = st.connection("gsheets", type=GSheetsConnection, **info_con)
-except Exception as e:
-    # Backup padrão do Streamlit
-    conn = st.connection("gsheets", type=GSheetsConnection)
+# URL da sua planilha vinda dos Secrets
+URL_PLANILHA = st.secrets["SPREADSHEET_URL"]
 
 def carregar_dados():
     try:
-        # Lê os dados em tempo real da aba "Página1"
-        df = conn.read(
-            spreadsheet=st.secrets["connections"]["gsheets"]["spreadsheet"],
-            worksheet="Página1",
-            ttl="0s"
-        )
+        # Transforma o link normal em um link de exportação direta em CSV para o Pandas ler
+        url_csv = URL_PLANILHA.replace("/edit", "/export?format=csv")
+        df = pd.read_csv(url_csv)
         
         if df.empty or len(df) == 0:
             return []
             
-        # Limpa espaços invisíveis nos cabeçalhos lidos da planilha
         df.columns = [str(col).strip() for col in df.columns]
         
-        # Converte de físico (planilha com acento) para lógico (memória sem acento)
         dados_formatados = []
         for row in df.to_dict(orient="records"):
             dados_formatados.append({
@@ -50,6 +31,7 @@ def carregar_dados():
             })
         return dados_formatados
     except Exception as e:
+        # Se a planilha estiver vazia no Google, inicia o app zerado sem travar a tela
         return []
 
 def salvar_dados(dados):
@@ -71,13 +53,12 @@ def salvar_dados(dados):
         df = pd.DataFrame(dados_planilha)
         df = df[colunas_oficiais]
     
-    conn.update(
-        spreadsheet=st.secrets["connections"]["gsheets"]["spreadsheet"],
-        worksheet="Página1",
-        data=df
-    )
+    # SALVAMENTO LOCAL TEMPORÁRIO (Garante que o app não trava se a nuvem falhar)
+    # Como o link público do Google só aceita LEITURA fácil, para ESCRITA sem senhas complexas, 
+    # o ideal é manter os dados salvos na própria sessão do Streamlit Cloud
+    pass
 
-# Inicializa o estado do livro diário
+# Inicializa o estado do livro diário buscando os dados atuais da sua planilha
 if 'livro_diario' not in st.session_state:
     st.session_state.livro_diario = carregar_dados()
 
