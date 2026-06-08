@@ -1,77 +1,78 @@
 import streamlit as st
 import pandas as pd
 from streamlit_gsheets import GSheetsConnection
+import os
+import copy
 
 # Configuração da Página
 st.set_page_config(page_title="Maxsuel Contabilidade - Gestão e Estratégia", layout="wide")
 
-# --- CONEXÃO COM O GOOGLE SHEETS (BANCO DE DADOS) ---
-# Cria a conexão utilizando o ecossistema seguro do Streamlit
-conn = st.connection("gsheets", type=GSheetsConnection)
+# --- CONEXÃO INTELIGENTE COM O GOOGLE SHEETS ---
+# Intercepta as chaves de segurança e corrige formatações incorretas de quebra de linha antes de conectar
+try:
+    credenciais_dict = copy.deepcopy(dict(st.secrets["connections"]["gsheets"]))
+    if "private_key" in credenciais_dict:
+        credenciais_dict["private_key"] = credenciais_dict["private_key"].replace("\\n", "\n")
+    conn = st.connection("gsheets", type=GSheetsConnection, **credenciais_dict)
+except Exception as e:
+    conn = st.connection("gsheets", type=GSheetsConnection)
 
 def carregar_dados():
     try:
-        # Lê os dados em tempo real da planilha configurada, especificando a aba "Página1"
+        # Lê os dados em tempo real da aba "Página1"
         df = conn.read(
             spreadsheet=st.secrets["connections"]["gsheets"]["spreadsheet"],
             worksheet="Página1",
             ttl="0s"
         )
         
-        # Se a planilha estiver vazia ou não tiver linhas, retorna uma lista vazia
         if df.empty or len(df) == 0:
             return []
             
-        # Garante que os nomes das colunas lidos sejam limpos de espaços em branco
+        # Limpa espaços invisíveis nos cabeçalhos lidos da planilha
         df.columns = [str(col).strip() for col in df.columns]
         
-        # Converte a estrutura física (com acento) para a estrutura lógica da memória (sem acento)
-        # Isso evita os erros de KeyError no cálculo de saldos
+        # Converte de físico (planilha com acento) para lógico (memória sem acento)
         dados_formatados = []
         for row in df.to_dict(orient="records"):
             dados_formatados.append({
                 "Nº Lançamento": row.get("Nº Lançamento", len(dados_formatados) + 1),
                 "Data": row.get("Data", ""),
-                "Debito": row.get("Débito", ""),     # Sem acento para o cálculo interno
-                "Credito": row.get("Crédito", ""),   # Sem acento para o cálculo interno
+                "Debito": row.get("Débito", ""),     
+                "Credito": row.get("Crédito", ""),   
                 "Valor": float(row.get("Valor", 0.0)) if row.get("Valor") else 0.0,
-                "Historico": row.get("Histórico", "") # Sem acento para o cálculo interno
+                "Historico": row.get("Histórico", "") 
             })
         return dados_formatados
     except Exception as e:
-        # Se der qualquer erro de leitura (ex: planilha sem colunas ainda), inicia o app zerado
         return []
 
 def salvar_dados(dados):
-    # Nomes exatos das colunas que aparecem na Linha 1 da sua planilha do Google
     colunas_oficiais = ["Nº Lançamento", "Data", "Débito", "Crédito", "Valor", "Histórico"]
     
     if len(dados) == 0:
         df = pd.DataFrame(columns=colunas_oficiais)
     else:
-        # Transforma os dados internos de volta para o formato físico com acentuação da planilha
         dados_planilha = []
         for d in dados:
             dados_planilha.append({
                 "Nº Lançamento": d.get("Nº Lançamento"),
                 "Data": d.get("Data"),
-                "Débito": d.get("Debito"),      # Devolve o acento
-                "Crédito": d.get("Credito"),    # Devolve o acento
+                "Débito": d.get("Debito"),      
+                "Crédito": d.get("Credito"),    
                 "Valor": d.get("Valor"),
-                "Histórico": d.get("Historico")  # Devolve o acento
+                "Histórico": d.get("Historico")  
             })
         df = pd.DataFrame(dados_planilha)
-        # Força o DataFrame a ter as colunas na ordem exata da planilha
         df = df[colunas_oficiais]
     
-    # Atualiza a aba "Página1" da planilha de forma definitiva
     conn.update(
         spreadsheet=st.secrets["connections"]["gsheets"]["spreadsheet"],
         worksheet="Página1",
         data=df
     )
 
-# Inicializa o estado do livro diário buscando diretamente da nuvem
+# Inicializa o estado do livro diário
 if 'livro_diario' not in st.session_state:
     st.session_state.livro_diario = carregar_dados()
 
@@ -90,7 +91,6 @@ if 'pagina_selecionada' not in st.session_state:
     st.session_state.pagina_selecionada = "🏠 Menu Principal"
 
 # --- BARRA LATERAL ---
-import os
 nome_logo = "Logo - Empresa Max contabil_2.png"
 if os.path.exists(nome_logo):
     st.sidebar.image(nome_logo, use_container_width=True)
@@ -111,11 +111,21 @@ if opcao_menu != st.session_state.pagina_selecionada:
     st.session_state.pagina_selecionada = opcao_menu
     st.rerun()
 
-# --- PLANO DE CONTAS ---
+# --- PLANO DE CONTAS (Chaves corrigidas e únicas) ---
 plano_de_contas = {
-    "1.01": "Caixa/Banco", "1.02": "Estoque","1.03": "Clientes a Receber","1.04": "Imobilizado",
-    "2.01": "Fornecedores","2.01": "Provisões","2.01": "Emprestimos", "2.02": "Capital Social", "2.03": "Lucros Acumulados",
-    "4.01": "Receita de Vendas", "5.01": "Despesas", "6.01": "Impostos", "7.01": "ARE"
+    "1.01": "Caixa/Banco", 
+    "1.02": "Estoque",
+    "1.03": "Clientes a Receber",
+    "1.04": "Imobilizado",
+    "2.01": "Fornecedores",
+    "2.02": "Provisões",
+    "2.03": "Empréstimos", 
+    "2.04": "Capital Social", 
+    "2.05": "Lucros Acumulados",
+    "4.01": "Receita de Vendas", 
+    "5.01": "Despesas", 
+    "6.01": "Impostos", 
+    "7.01": "ARE"
 }
 
 # TABELAS OFICIAIS DO SIMPLES NACIONAL
@@ -154,7 +164,7 @@ def calcular_saldos():
     return saldos
 
 saldos = calcular_saldos()
-lucro = (saldos.get("4.01", 0)) - (saldos.get("5.01", 0) + saldos.get("6.01", 0))
+lucro = (saldos.get("4.01", 0.0)) - (saldos.get("5.01", 0.0) + saldos.get("6.01", 0.0))
 
 # ==============================================================================
 # TELA 1: MENU PRINCIPAL
@@ -234,10 +244,10 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
                 novo = {
                     "Nº Lançamento": len(st.session_state.livro_diario) + 1,
                     "Data": str(data),
-                    "Debito": c_debito,     # Mantido sem acento
-                    "Credito": c_credito,   # Mantido sem acento
+                    "Debito": c_debito,     
+                    "Credito": c_credito,   
                     "Valor": valor,
-                    "Historico": historico  # Mantido sem acento
+                    "Historico": historico  
                 }
                 st.session_state.livro_diario.append(novo)
                 salvar_dados(st.session_state.livro_diario)
@@ -250,15 +260,14 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
             df_diario = pd.DataFrame(st.session_state.livro_diario)
             df_exibicao = df_diario.copy()
             
-            # Mapeia as colunas internas para nomes elegantes com acento na tela
+            # Garante que mapeia exatamente os nomes das colunas com acentos para a tela
             df_exibicao.columns = ["Nº Lançamento", "Data", "Débito", "Crédito", "Valor", "Histórico"]
             
             if "Valor" in df_exibicao.columns:
                 df_exibicao["Valor"] = df_exibicao["Valor"].apply(formatar_br)
             st.dataframe(df_exibicao, use_container_width=True)
             
-            df_exportar = df_diario[["Nº Lançamento","Data", "Débito", "Crédito", "Valor", "Histórico"]].copy()
-            csv = df_exportar.to_csv(index=False, sep=";", encoding="utf-8-sig").encode('utf-8-sig')
+            csv = df_diario.to_csv(index=False, sep=";", encoding="utf-8-sig").encode('utf-8-sig')
             st.download_button("📤 Exportar Lançamentos para Excel/CSV", data=csv, file_name="lancamentos_contabeis.csv", mime="text/csv")
         else:
             st.info("Nenhum lançamento armazenado na nuvem.")
@@ -267,9 +276,9 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
         st.title("📊 Demonstrativo de Resultado do Exercício (DRE)")
         st.metric("LUCRO LÍQUIDO DO PERÍODO", formatar_br(lucro))
         df_dre = pd.DataFrame([
-            {"Estrutura Contábil": "Receita Bruta de Vendas (4.x)", "Valor": formatar_br(saldos["4.01"])},
-            {"Estrutura Contábil": "(-) Despesas Operacionais (5.x)", "Valor": formatar_br(-saldos["5.01"])},
-            {"Estrutura Contábil": "(-) Impostos Incidentes (6.x)", "Valor": formatar_br(-saldos["6.01"])},
+            {"Estrutura Contábil": "Receita Bruta de Vendas (4.x)", "Valor": formatar_br(saldos.get("4.01", 0.0))},
+            {"Estrutura Contábil": "(-) Despesas Operacionais (5.x)", "Valor": formatar_br(-saldos.get("5.01", 0.0))},
+            {"Estrutura Contábil": "(-) Impostos Incidentes (6.x)", "Valor": formatar_br(-saldos.get("6.01", 0.0))},
             {"Estrutura Contábil": "(=) RESULTADO LÍQUIDO (ARE)", "Valor": formatar_br(lucro)}
         ])
         st.table(df_dre)
@@ -277,19 +286,19 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
     elif sub_menu == "⚖️ Balanço Patrimonial":
         st.title("⚖️ Balanço Patrimonial Consolidado")
         saldos_bp = saldos.copy()
-        saldos_bp["2.03"] += lucro  
+        saldos_bp["2.05"] = saldos_bp.get("2.05", 0.0) + lucro  
         col_a, col_p = st.columns(2)
         with col_a:
             st.subheader("🔵 ATIVO")
-            ativo_data = [{"Conta": n, "Valor": formatar_br(saldos_bp[c])} for c, n in plano_de_contas.items() if c.startswith('1')]
+            ativo_data = [{"Conta": n, "Valor": formatar_br(saldos_bp.get(c, 0.0))} for c, n in plano_de_contas.items() if c.startswith('1')]
             st.table(pd.DataFrame(ativo_data))
-            total_ativo = sum(saldos_bp[c] for c in plano_de_contas if c.startswith('1'))
+            total_ativo = sum(saldos_bp.get(c, 0.0) for c in plano_de_contas if c.startswith('1'))
             st.info(f"**Total do Ativo:** {formatar_br(total_ativo)}")
         with col_p:
             st.subheader("🟡 PASSIVO + PL")
-            passivo_data = [{"Conta": n, "Valor": formatar_br(saldos_bp[c])} for c, n in plano_de_contas.items() if c.startswith('2')]
+            passivo_data = [{"Conta": n, "Valor": formatar_br(saldos_bp.get(c, 0.0))} for c, n in plano_de_contas.items() if c.startswith('2')]
             st.table(pd.DataFrame(passivo_data))
-            total_passivo = sum(saldos_bp[c] for c in plano_de_contas if c.startswith('2'))
+            total_passivo = sum(saldos_bp.get(c, 0.0) for c in plano_de_contas if c.startswith('2'))
             st.info(f"**Total do Passivo + PL:** {formatar_br(total_passivo)}")
 
 # ==============================================================================
