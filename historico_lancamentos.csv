@@ -1,0 +1,5 @@
+Data,Débito,Crédito,Valor,Histórico
+2026-06-08,1.02,2.01,10000.0,Compra de mercadoria para revenda NF-002345
+2026-06-08,1.01,4.01,5600.0,Revenda de mercadoria NF-000001
+2026-06-08,5.01,1.02,0.01,Baixa de mercadoria vendidas
+2026-06-08,5.01,1.02,2999.99,Baixa total referente a venda de mercadorias nf-000001
