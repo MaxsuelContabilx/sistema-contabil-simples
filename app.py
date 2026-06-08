@@ -16,7 +16,7 @@ def carregar_dados():
         if df.empty:
             return []
         # Garante as colunas corretas e limpas
-        df.columns = ["Data", "Debito", "Credito", "Valor", "Historico"]
+        df.columns = ["Nº Lançamento","Data", "Debito", "Credito", "Valor", "Historico"]
         return df.to_dict(orient="records")
     except Exception as e:
         # Se a planilha estiver totalmente vazia (sem cabeçalho ainda), retorna lista vazia
@@ -24,10 +24,10 @@ def carregar_dados():
 
 def salvar_dados(dados):
     if len(dados) == 0:
-        df = pd.DataFrame(columns=["Data", "Debito", "Credito", "Valor", "Historico"])
+        df = pd.DataFrame(columns=["Nº Lançamento","Data", "Debito", "Credito", "Valor", "Historico"])
     else:
         df = pd.DataFrame(dados)
-        df = df[["Data", "Debito", "Credito", "Valor", "Historico"]]
+        df = df[["Nº Lançamento","Data", "Debito", "Credito", "Valor", "Historico"]]
     
     # Atualiza a planilha na nuvem de forma definitiva
     conn.update(data=df)
@@ -192,7 +192,12 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
             historico = st.text_input("Histórico / Descrição da Operação")
             
             if st.form_submit_button("Confirmar e Salvar Lançamento"):
-                novo = {"Data": str(data), "Debito": c_debito, "Credito": c_credito, "Valor": valor, "Historico": historico}
+                novo = {"Nº Lançamento": len(st.session_state.livro_diario) + 1,
+                "Data": str(data),
+                "Débito": c_debito,    # Adicionado o acento para coincidir com a planilha
+                "Crédito": c_credito,  # Adicionado o acento para coincidir com a planilha
+                "Valor": valor,
+                "Histórico": historico # Adicionado o acento para coincidir com a planilha}
                 st.session_state.livro_diario.append(novo)
                 salvar_dados(st.session_state.livro_diario)
                 st.success("Lançamento gravado com sucesso na nuvem!")
