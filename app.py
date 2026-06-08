@@ -67,8 +67,8 @@ if opcao_menu != st.session_state.pagina_selecionada:
 
 # --- PLANO DE CONTAS ---
 plano_de_contas = {
-    "1.01": "Caixa/Banco", "1.02": "Imobilizado",
-    "2.01": "Fornecedores", "2.02": "Capital Social", "2.03": "Lucros Acumulados",
+    "1.01": "Caixa/Banco", "1.02": "Estoque","1.03": "Clientes a Receber","1.04": "Imobilizado",
+    "2.01": "Fornecedores","2.01": "Provisões","2.01": "Emprestimos", "2.02": "Capital Social", "2.03": "Lucros Acumulados",
     "4.01": "Receita de Vendas", "5.01": "Despesas", "6.01": "Impostos", "7.01": "ARE"
 }
 
