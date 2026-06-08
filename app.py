@@ -11,27 +11,49 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 
 def carregar_dados():
     try:
-        # Lê os dados em tempo real da planilha configurada
-        df = conn.read(ttl="0s") # ttl="0s" limpa o cache para trazer dados sempre novos
+        # Lê os dados em tempo real da planilha configurada no secrets
+        df = conn.read(ttl="0s")
         if df.empty:
             return []
         
-        # ATENÇÃO: Mudamos para nomes padronizados sem acento para não quebrar o calcular_saldos()
-        df.columns = ["Nº Lançamento", "Data", "Debito", "Credito", "Valor", "Historico"]
-        return df.to_dict(orient="records")
+        # Sincroniza os nomes exatos das colunas da sua imagem
+        df.columns = ["Nº Lançamento", "Data", "Débito", "Crédito", "Valor", "Histórico"]
+        
+        # Converte para uma lista de dicionários mudando internamente para chaves sem acento
+        # Isso garante que a sua função calcular_saldos() continue a funcionar sem sofrer com acentuação
+        dados_formatados = []
+        for row in df.to_dict(orient="records"):
+            dados_formatados.append({
+                "Nº Lançamento": row["Nº Lançamento"],
+                "Data": row["Data"],
+                "Debito": row["Débito"],     # Remove acento para o cálculo interno
+                "Credito": row["Crédito"],   # Remove acento para o cálculo interno
+                "Valor": row["Valor"],
+                "Historico": row["Histórico"] # Remove acento para o cálculo interno
+            })
+        return dados_formatados
     except Exception as e:
         return []
 
 def salvar_dados(dados):
     if len(dados) == 0:
-        df = pd.DataFrame(columns=["Nº Lançamento", "Data", "Debito", "Credito", "Valor", "Historico"])
+        df = pd.DataFrame(columns=["Nº Lançamento", "Data", "Débito", "Crédito", "Valor", "Histórico"])
     else:
-        df = pd.DataFrame(dados)
-        # Garante a ordem correta das colunas antes de enviar
-        df = df[["Nº Lançamento", "Data", "Debito", "Credito", "Valor", "Historico"]]
+        # Reconverte a estrutura de memória para a estrutura física da folha com acentos
+        dados_planilha = []
+        for d in dados:
+            dados_planilha.append({
+                "Nº Lançamento": d.get("Nº Lançamento"),
+                "Data": d.get("Data"),
+                "Débito": d.get("Debito"),      # Devolve o acento antes de enviar
+                "Crédito": d.get("Credito"),    # Devolve o acento antes de enviar
+                "Valor": d.get("Valor"),
+                "Histórico": d.get("Historico")  # Devolve o acento antes de enviar
+            })
+        df = pd.DataFrame(dados_planilha)
+        df = df[["Nº Lançamento", "Data", "Débito", "Crédito", "Valor", "Histórico"]]
     
-    # IMPORTANTE: Adicione o link da sua planilha para corrigir o erro da imagem image_a71c0b.png
-    # Substitua abaixo pelo link real da sua planilha se necessário, ou use o st.secrets
+    # Atualiza a planilha mapeada no secrets
     conn.update(
         spreadsheet=st.secrets["connections"]["gsheets"]["spreadsheet"],
         data=df
