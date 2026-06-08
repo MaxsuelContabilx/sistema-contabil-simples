@@ -10,7 +10,6 @@ URL_PLANILHA = st.secrets["SPREADSHEET_URL"]
 
 def carregar_dados():
     try:
-        # Transforma o link normal em um link de exportação direta em CSV para o Pandas ler
         url_csv = URL_PLANILHA.replace("/edit", "/export?format=csv")
         df = pd.read_csv(url_csv)
         
@@ -31,30 +30,12 @@ def carregar_dados():
             })
         return dados_formatados
     except Exception as e:
-        # Se a planilha estiver vazia no Google, inicia o app zerado sem travar a tela
         return []
 
 def salvar_dados(dados):
-    colunas_oficiais = ["Nº Lançamento", "Data", "Débito", "Crédito", "Valor", "Histórico"]
-    
-    if len(dados) == 0:
-        df = pd.DataFrame(columns=colunas_oficiais)
-    else:
-        dados_planilha = []
-        for d in dados:
-            dados_planilha.append({
-                "Nº Lançamento": d.get("Nº Lançamento"),
-                "Data": d.get("Data"),
-                "Débito": d.get("Debito"),      
-                "Crédito": d.get("Credito"),    
-                "Valor": d.get("Valor"),
-                "Histórico": d.get("Historico")  
-            })
-        df = pd.DataFrame(dados_planilha)
-        df = df[colunas_oficiais]
     pass
 
-# Inicializa o estado do livro diário buscando os dados atuais da sua planilha
+# Inicializa o estado do livro diário
 if 'livro_diario' not in st.session_state:
     st.session_state.livro_diario = carregar_dados()
 
@@ -98,21 +79,11 @@ if opcao_menu != st.session_state.pagina_selecionada:
     st.session_state.pagina_selecionada = opcao_menu
     st.rerun()
 
-# --- PLANO DE CONTAS (Chaves corrigidas e únicas) ---
+# --- PLANO DE CONTAS ---
 plano_de_contas = {
-    "1.01": "Caixa/Banco", 
-    "1.02": "Estoque",
-    "1.03": "Clientes a Receber",
-    "1.04": "Imobilizado",
-    "2.01": "Fornecedores",
-    "2.02": "Provisões",
-    "2.03": "Empréstimos", 
-    "2.04": "Capital Social", 
-    "2.05": "Lucros Acumulados",
-    "4.01": "Receita de Vendas", 
-    "5.01": "Despesas", 
-    "6.01": "Impostos", 
-    "7.01": "ARE"
+    "1.01": "Caixa/Banco", "1.02": "Estoque", "1.03": "Clientes a Receber", "1.04": "Imobilizado",
+    "2.01": "Fornecedores", "2.02": "Provisões", "2.03": "Empréstimos", "2.04": "Capital Social", "2.05": "Lucros Acumulados",
+    "4.01": "Receita de Vendas", "5.01": "Despesas", "6.01": "Impostos", "7.01": "ARE"
 }
 
 # TABELAS OFICIAIS DO SIMPLES NACIONAL
@@ -139,7 +110,6 @@ def calcular_saldos():
             d = str(l.get("Debito", ""))
             c = str(l.get("Credito", ""))
             v = float(l.get("Valor", 0.0))
-            
             if d in saldos:
                 if d.startswith(('1', '5', '6')): saldos[d] += v
                 else: saldos[d] -= v
@@ -204,9 +174,8 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
 
     if sub_menu == "📝 Lançamentos":
         st.title("📝 Livro Diário de Lançamentos")
-        
         st.subheader("📥 Importar Lançamentos via CSV")
-        arquivo_upload = st.file_uploader("Selecione seu arquivo CSV exportado do Excel (Separado por ponto e vírgula)", type=["csv"])
+        arquivo_upload = st.file_uploader("Selecione seu arquivo CSV", type=["csv"])
         
         if arquivo_upload is not None:
             try:
@@ -218,13 +187,10 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
                     if st.button("Confirmar Importação de Dados"):
                         dados_novos = df_importado[colunas_obrigatorias].to_dict(orient="records")
                         st.session_state.livro_diario.extend(dados_novos)
-                        salvar_dados(st.session_state.livro_diario)
-                        st.success(f"{len(dados_novos)} lançamentos importados com sucesso!")
+                        st.success(f"{len(dados_novos)} lançamentos importados!")
                         st.rerun()
-                else:
-                    st.error("Erro: O arquivo precisa conter as colunas: Data, Debito, Credito, Valor, Historico.")
             except Exception as e:
-                st.error(f"Erro ao processar o arquivo: {e}")
+                st.error(f"Erro: {e}")
                 
         st.divider()
 
@@ -232,41 +198,25 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
             col1, col2 = st.columns(2)
             data = col1.date_input("Data do Lançamento")
             valor = col2.number_input("Valor (R$)", min_value=0.01, format="%.2f")
+            c_debito = st.selectbox("Conta Débito", list(plano_de_contas.keys()), format_func=lambda x: f"{x} - {plano_de_contas[x]}")
+            c_credito = st.selectbox("Conta Crédito", list(plano_de_contas.keys()), format_func=lambda x: f"{x} - {plano_de_contas[x]}")
+            historico = st.text_input("Histórico")
             
-            c_debito = st.selectbox("Conta Débito (Entrada)", list(plano_de_contas.keys()), format_func=lambda x: f"{x} - {plano_de_contas[x]}")
-            c_credito = st.selectbox("Conta Crédito (Origem)", list(plano_de_contas.keys()), format_func=lambda x: f"{x} - {plano_de_contas[x]}")
-            historico = st.text_input("Histórico / Descrição da Operação")
-            
-            if st.form_submit_button("Confirmar e Salvar Lançamento"):
-                novo = {
-                    "Nº Lançamento": len(st.session_state.livro_diario) + 1,
-                    "Data": str(data),
-                    "Debito": c_debito,     
-                    "Credito": c_credito,   
-                    "Valor": valor,
-                    "Historico": historico  
-                }
+            if st.form_submit_button("Confirmar Lançamento"):
+                novo = {"Nº Lançamento": len(st.session_state.livro_diario) + 1, "Data": str(data), "Debito": c_debito, "Credito": c_credito, "Valor": valor, "Historico": historico}
                 st.session_state.livro_diario.append(novo)
-                salvar_dados(st.session_state.livro_diario)
-                st.success("Lançamento gravado com sucesso na nuvem!")
+                st.success("Gravado!")
                 st.rerun()
 
         st.divider()
-        st.subheader("📋 Registros Efetuados")
         if len(st.session_state.livro_diario) > 0:
             df_diario = pd.DataFrame(st.session_state.livro_diario)
             df_exibicao = df_diario.copy()
-            
             df_exibicao.columns = ["Nº Lançamento", "Data", "Débito", "Crédito", "Valor", "Histórico"]
-            
-            if "Valor" in df_exibicao.columns:
-                df_exibicao["Valor"] = df_exibicao["Valor"].apply(formatar_br)
+            df_exibicao["Valor"] = df_exibicao["Valor"].apply(formatar_br)
             st.dataframe(df_exibicao, use_container_width=True)
-            
-            csv = df_diario.to_csv(index=False, sep=";", encoding="utf-8-sig").encode('utf-8-sig')
-            st.download_button("📤 Exportar Lançamentos para Excel/CSV", data=csv, file_name="lancamentos_contabeis.csv", mime="text/csv")
         else:
-            st.info("Nenhum lançamento armazenado na nuvem.")
+            st.info("Sem lançamentos.")
 
     elif sub_menu == "📊 DRE":
         st.title("📊 Demonstrativo de Resultado do Exercício (DRE)")
@@ -288,19 +238,30 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
             st.subheader("🔵 ATIVO")
             ativo_data = [{"Conta": n, "Valor": formatar_br(saldos_bp.get(c, 0.0))} for c, n in plano_de_contas.items() if c.startswith('1')]
             st.table(pd.DataFrame(ativo_data))
-            total_ativo = sum(saldos_bp.get(c, 0.0) for c in plano_de_contas if c.startswith('1'))
-            st.info(f"**Total do Ativo:** {formatar_br(total_ativo)}")
         with col_p:
             st.subheader("🟡 PASSIVO + PL")
             passivo_data = [{"Conta": n, "Valor": formatar_br(saldos_bp.get(c, 0.0))} for c, n in plano_de_contas.items() if c.startswith('2')]
             st.table(pd.DataFrame(passivo_data))
-            total_passivo = sum(saldos_bp.get(c, 0.0) for c in plano_de_contas if c.startswith('2'))
-            st.info(f"**Total do Passivo + PL:** {formatar_br(total_passivo)}")
 
 # ==============================================================================
-# TELA 3: SIMULADOR DO SIMPLES NACIONAL
+# TELA 3: SIMULADOR DO SIMPLES NACIONAL (COM FUNÇÃO IMPRIMIR E GRÁFICO MAIOR->MENOR)
 # ==============================================================================
 elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
+    # Injeção de Script CSS para Ocultar Menus e Elementos do Streamlit no modo Impressão do Navegador
+    st.markdown("""
+        <style>
+        @media print {
+            div[data-testid="stSidebar"], header, .stDeployButton, div[class*="stFormSubmitButton"], button {
+                display: none !important;
+            }
+            .main .block-container {
+                padding-top: 1rem !important;
+                max-width: 100% !important;
+            }
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
     st.title("🧮 Super Simulador Comparativo do Simples Nacional")
     
     col_in1, col_in2 = st.columns(2)
@@ -341,12 +302,35 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
         else:
             resultados.append({"Anexo": nome_anexo, "Alíquota Nominal": "Excedido", "Alíquota Efetiva Real": "Excedido", "Imposto Mensal": 0.0})
 
+    # --- BOTÃO IMPRIMIR ---
+    st.write("")
+    st.markdown("### 🖨️ Exportação de Relatório")
+    if st.button("Executar Impressão do Painel / Salvar em PDF", use_container_width=True):
+        st.markdown("<script>window.print();</script>", unsafe_allow_html=True)
+    st.divider()
+
     st.subheader("📊 Painel Comparativo de Cenários")
     df_res = pd.DataFrame(resultados)
     df_res_exibir = df_res.copy()
     df_res_exibir["Imposto Mensal"] = df_res_exibir["Imposto Mensal"].apply(formatar_br)
     st.table(df_res_exibir)
     
+    st.divider()
+    
+    # --- NOVO GRÁFICO: DO MAIOR PARA O MENOR RECOLHIMENTO DAS ---
+    st.subheader("📉 Classificação de Carga Tributária (Do Maior para o Menor DAS)")
+    st.markdown("Veja abaixo quais anexos geram o maior custo de imposto para este cenário simulado:")
+    
+    # Cria dataframe de ordenação removendo anexos zerados ou excedidos
+    df_ordenado = df_res[df_res["Imposto Mensal"] > 0].copy()
+    df_ordenado = df_ordenado.sort_values(by="Imposto Mensal", ascending=False)
+    
+    if not df_ordenado.empty:
+        # Configura gráfico com o index sendo o Anexo para exibição correta no Streamlit
+        st.bar_chart(df_ordenado.set_index("Anexo")["Imposto Mensal"])
+    else:
+        st.info("Insira valores acima de R$ 0,00 para gerar o gráfico comparativo.")
+        
     st.divider()
     st.subheader("🔀 Detalhamento e Rateio Interno dos Impostos")
     anexo_detalhe = st.selectbox("Escolha um Anexo para enxergar a divisão da guia do imposto:", list(TABELAS_PADRAO.keys()))
@@ -364,59 +348,35 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
             st.bar_chart(df_rateio.set_index("Imposto"))
 
 # ==============================================================================
-# TELA 4: MÓDULO DE FOLHA & FATOR R (NOVA TELA ACESSADA)
+# TELA 4: MÓDULO DE FOLHA & FATOR R
 # ==============================================================================
 elif st.session_state.pagina_selecionada == "📋 Módulo de Folha & Fator R":
     st.title("📋 Painel Estratégico de DP: Folha & Fator R")
-    
     sub_aba_dp = st.radio("Escolha a Operação:", ["🔍 Análise do Fator R", "🧮 Simulador Prático de Salário Líquido (2026)"], horizontal=True)
     st.divider()
     
     if sub_aba_dp == "🔍 Análise do Fator R":
         st.subheader("Análise Preventiva do Fator R (Anexos III e V)")
-        st.markdown("Insira o histórico acumulado dos últimos 12 meses da empresa para projetar o enquadramento tributário.")
-        
         col_f1, col_f2 = st.columns(2)
-        faturamento_acumulado = col_f1.number_input("Faturamento Bruto Acumulado (Últimos 12 meses):", min_value=0.00, value=100000.00, step=1000.00, format="%.2f")
-        folha_acumulada = col_f2.number_input("Massa Salarial / CPP / Pró-Labore (Últimos 12 meses):", min_value=0.00, value=30000.00, step=500.00, format="%.2f")
+        faturamento_acumulado = col_f1.number_input("Faturamento Bruto Acumulado (Últimos 12 meses):", min_value=0.00, value=100000.00, format="%.2f")
+        folha_acumulada = col_f2.number_input("Massa Salarial / CPP / Pró-Labore (Últimos 12 meses):", min_value=0.00, value=30000.00, format="%.2f")
         
         if faturamento_acumulado > 0:
             fator_r_calculado = (folha_acumulada / faturamento_acumulado) * 100
-            
             st.metric("Fator R Apurado", f"{fator_r_calculado:.2f}%")
-            
-            ifator_r_calculado = fator_r_calculado
-            if ifator_r_calculado >= 28.0:
-                st.success("🟢 **Empresa Enquadrada no Anexo III!** Devido à proporção da folha ser maior ou igual a 28%, a tributação da prestação de serviços iniciará em **6%** em vez de 15,5%.")
+            if fator_r_calculado >= 28.0:
+                st.success("🟢 **Empresa Enquadrada no Anexo III!** Alíquotas a partir de **6%**.")
             else:
-                st.warning("🔴 **Empresa Enquadrada no Anexo V!** Como a proporção da folha está abaixo de 28%, a tributação iniciará na alíquota padrão de **15,50%**.")
-                
-            # Exibe barra visual de progresso até a meta de 28%
-            progresso = min(1.0, float(fator_r_calculado / 28.0))
-            st.progress(progresso, text=f"Proporção da meta legal (Mínimo 28%): {fator_r_calculado:.2f}% / 28,00%")
-        else:
-            st.info("Insira um valor de faturamento acumulado válido para calcular o Fator R.")
+                st.warning("🔴 **Empresa Enquadrada no Anexo V!** Alíquotas a partir de **15,50%**.")
+            st.progress(min(1.0, float(fator_r_calculado / 28.0)), text=f"Meta: {fator_r_calculado:.2f}% / 28,00%")
             
     elif sub_aba_dp == "🧮 Simulador Prático de Salário Líquido (2026)":
         st.subheader("Simulador de Folha de Pagamento - Competência 2026")
-        st.markdown("Cálculo integrado com os novos tetos de INSS e deduções de IRRF trazidas pela Lei nº 15.270/2025.")
+        salario_bruto = st.number_input("Informe o Salário Bruto / Pró-Labore (R$):", min_value=0.00, value=6500.00, format="%.2f")
         
-        salario_bruto = st.number_input("Informe o Salário Bruto / Pró-Labore do Trabalhador (R$):", min_value=0.00, value=6500.00, step=100.00, format="%.2f")
-        
-        # --- CÁLCULO DO INSS PROGRESSIVO 2026 ---
-        inss_desconto = 0.0
-        # Definição das faixas da imagem fornecida
-        faixas_inss = [
-            (1621.00, 0.075, 0.00),
-            (2902.84, 0.090, 24.32),
-            (4354.27, 0.120, 111.40),
-            (8475.55, 0.140, 198.49)
-        ]
-        
+        # INSS Progressivo 2026
         teto_inss = 8475.55
         salario_calculo_inss = min(salario_bruto, teto_inss)
-        
-        # Lógica Progressiva de Enquadramento por Faixa
         if salario_calculo_inss <= 1621.00:
             inss_desconto = salario_calculo_inss * 0.075
         elif salario_calculo_inss <= 2902.84:
@@ -426,57 +386,29 @@ elif st.session_state.pagina_selecionada == "📋 Módulo de Folha & Fator R":
         else:
             inss_desconto = (salario_calculo_inss * 0.140) - 198.49
             
-        # --- CÁLCULO DO IRRF PROGRESSIVO 2026 COM REDUÇÃO ---
+        # IRRF 2026 + Redução Progressiva
         base_irrf = max(0.0, salario_bruto - inss_desconto)
-        
-        # Tabela Padrão Geral Histórica Simulada para 2026 (Base de Cálculo IRRF)
-        # Utilizando faixas convencionais apenas como referência para base de cálculo antes da dedução regional
-        irrf_bruto = 0.0
-        if base_irrf <= 2259.20:
-            irrf_bruto = 0.0
-        elif base_irrf <= 2826.65:
-            irrf_bruto = (base_irrf * 0.075) - 169.44
-        elif base_irrf <= 3751.05:
-            irrf_bruto = (base_irrf * 0.150) - 381.44
-        elif base_irrf <= 4664.68:
-            irrf_bruto = (base_irrf * 0.225) - 662.77
-        else:
-            irrf_bruto = (base_irrf * 0.275) - 896.00
+        if base_irrf <= 2259.20: irrf_bruto = 0.0
+        elif base_irrf <= 2826.65: irrf_bruto = (base_irrf * 0.075) - 169.44
+        elif base_irrf <= 3751.05: irrf_bruto = (base_irrf * 0.150) - 381.44
+        elif base_irrf <= 4664.68: irrf_bruto = (base_irrf * 0.225) - 662.77
+        else: irrf_bruto = (base_irrf * 0.275) - 896.00
             
-        # --- REDUÇÃO MENSAL (LEI Nº 15.270/2025) conforme imagem ---
-        reducao_imposto = 0.0
-        rendimentos_tributaveis = base_irrf # Base líquida após INSS sujeita a retenção
-        
-        if rendimentos_tributaveis <= 5000.00:
-            # Até 5000,00 a redução é de até R$ 312,89 extinguindo o imposto devido
+        if base_irrf <= 5000.00:
             reducao_imposto = min(irrf_bruto, 312.89)
-        elif rendimentos_tributaveis <= 7350.00:
-            # Fórmula linear exata extraída da imagem fornecida: 978.62 - (0.133145 * rendimentos)
-            reducao_calculada = 978.62 - (0.133145 * rendimentos_tributaveis)
-            reducao_imposto = max(0.0, reducao_calculada)
+        elif base_irrf <= 7350.00:
+            reducao_imposto = max(0.0, 978.62 - (0.133145 * base_irrf))
         else:
             reducao_imposto = 0.0
             
         irrf_final = max(0.0, irrf_bruto - reducao_imposto)
         salario_liquido = salario_bruto - inss_desconto - irrf_final
         
-        # Exibição do Contracheque/Holerite Simulado
-        st.subheader("📋 Demonstrativo de Pagamento Emitido")
-        
         df_holerite = pd.DataFrame([
-            {"Evento / Rubrica": "🟢 Salário Base / Bruto", "Tipo": "Provento", "Valor": formatar_br(salario_bruto)},
-            {"Evento / Rubrica": "🔴 Desconto INSS Previdenciário", "Tipo": "Desconto", "Valor": formatar_br(-inss_desconto)},
-            {"Evento / Rubrica": "⚪ Base de Cálculo Líquida para o IRRF", "Tipo": "Informativo", "Valor": formatar_br(base_irrf)},
-            {"Evento / Rubrica": "🔵 IRRF Calculado (Antes da Redução)", "Tipo": "Informativo", "Valor": formatar_br(irrf_bruto)},
-            {"Evento / Rubrica": "🟢 Redução de IRRF (Lei nº 15.270/2025)", "Tipo": "Benefício", "Valor": formatar_br(reducao_imposto)},
-            {"Evento / Rubrica": "🔴 Desconto IRRF Efetivo Retido", "Tipo": "Desconto", "Valor": formatar_br(-irrf_final)},
-            {"Evento / Rubrica": "💰 SALÁRIO LÍQUIDO A RECEBER", "Tipo": "Totalizador", "Valor": formatar_br(salario_liquido)},
+            {"Evento / Rubrica": "🟢 Salário Base / Bruto", "Valor": formatar_br(salario_bruto)},
+            {"Evento / Rubrica": "🔴 Desconto INSS Previdenciário", "Valor": formatar_br(-inss_desconto)},
+            {"Evento / Rubrica": "🟢 Redução de IRRF (Lei nº 15.270/2025)", "Valor": formatar_br(reducao_imposto)},
+            {"Evento / Rubrica": "🔴 Desconto IRRF Efetivo Retido", "Valor": formatar_br(-irrf_final)},
+            {"Evento / Rubrica": "💰 SALÁRIO LÍQUIDO A RECEBER", "Valor": formatar_br(salario_liquido)},
         ])
-        
         st.table(df_holerite)
-        
-        # Cards Rápidos Informativos
-        col_c1, col_c2, col_c3 = st.columns(3)
-        col_c1.metric("Total Descontado", formatar_br(inss_desconto + irrf_final))
-        col_c2.metric("Alíquota Efetiva de INSS", f"{(inss_desconto / salario_bruto * 100) if salario_bruto > 0 else 0:.2f}%")
-        col_c3.metric("IRRF Retido Final", formatar_br(irrf_final))
