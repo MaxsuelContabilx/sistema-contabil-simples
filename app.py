@@ -215,7 +215,7 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
                 df_exibicao["Valor"] = df_exibicao["Valor"].apply(formatar_br)
             st.dataframe(df_exibicao, use_container_width=True)
             
-            df_exportar = df_diario[["Nº Lançamento","Data", "Débito", "Crédito", "Valor", "Histérico"]].copy()
+            df_exportar = df_diario[["Nº Lançamento","Data", "Débito", "Crédito", "Valor", "Histórico"]].copy()
             csv = df_exportar.to_csv(index=False, sep=";", encoding="utf-8-sig").encode('utf-8-sig')
             st.download_button("📤 Exportar Lançamentos para Excel/CSV", data=csv, file_name="lancamentos_contabeis.csv", mime="text/csv")
         else:
