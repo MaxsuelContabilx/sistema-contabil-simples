@@ -1,32 +1,38 @@
 import streamlit as st
 import pandas as pd
-import os
+from streamlit_gsheets import GSheetsConnection
 
 # Configuração da Página
 st.set_page_config(page_title="Maxsuel Contabilidade - Gestão e Estratégia", layout="wide")
 
-# --- GERENCIAMENTO DE BANCO DE DADOS (CSV) ---
-ARQUIVO_BANCO = "historico_lancamentos.csv"
+# --- CONEXÃO COM O GOOGLE SHEETS (BANCO DE DADOS) ---
+# Cria a conexão utilizando o ecossistema seguro do Streamlit
+conn = st.connection("gsheets", type=GSheetsConnection)
 
 def carregar_dados():
-    if os.path.exists(ARQUIVO_BANCO):
-        try:
-            # Carrega usando ponto e vírgula e codificação correta para o Brasil
-            df = pd.read_csv(ARQUIVO_BANCO, sep=";", encoding="utf-8-sig")
-            # Força o nome das colunas sem acento para evitar bugs de codificação
-            df.columns = ["Data", "Debito", "Credito", "Valor", "Historico"]
-            if not df.empty:
-                return df.to_dict(orient="records")
-        except:
+    try:
+        # Lê os dados em tempo real da planilha configurada
+        df = conn.read(ttl="0s") # ttl="0s" limpa o cache para trazer dados sempre novos
+        if df.empty:
             return []
-    return []
+        # Garante as colunas corretas e limpas
+        df.columns = ["Data", "Debito", "Credito", "Valor", "Historico"]
+        return df.to_dict(orient="records")
+    except Exception as e:
+        # Se a planilha estiver totalmente vazia (sem cabeçalho ainda), retorna lista vazia
+        return []
 
 def salvar_dados(dados):
-    df = pd.DataFrame(dados)
-    # Garante a ordem correta e salva compatível com Excel
-    df = df[["Data", "Debito", "Credito", "Valor", "Historico"]]
-    df.to_csv(ARQUIVO_BANCO, index=False, sep=";", encoding="utf-8-sig")
+    if len(dados) == 0:
+        df = pd.DataFrame(columns=["Data", "Debito", "Credito", "Valor", "Historico"])
+    else:
+        df = pd.DataFrame(dados)
+        df = df[["Data", "Debito", "Credito", "Valor", "Historico"]]
+    
+    # Atualiza a planilha na nuvem de forma definitiva
+    conn.update(data=df)
 
+# Inicializa o estado do livro diário buscando diretamente da nuvem
 if 'livro_diario' not in st.session_state:
     st.session_state.livro_diario = carregar_dados()
 
@@ -45,6 +51,7 @@ if 'pagina_selecionada' not in st.session_state:
     st.session_state.pagina_selecionada = "🏠 Menu Principal"
 
 # --- BARRA LATERAL ---
+import os
 nome_logo = "Logo - Empresa Max contabil_2.png"
 if os.path.exists(nome_logo):
     st.sidebar.image(nome_logo, use_container_width=True)
@@ -151,18 +158,14 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
     if sub_menu == "📝 Lançamentos":
         st.title("📝 Livro Diário de Lançamentos")
         
-        # --- SEÇÃO DE IMPORTAÇÃO DE ARQUIVOS (OTIMIZADA) ---
+        # --- SEÇÃO DE IMPORTAÇÃO DE ARQUIVOS ---
         st.subheader("📥 Importar Lançamentos via CSV")
         arquivo_upload = st.file_uploader("Selecione seu arquivo CSV exportado do Excel (Separado por ponto e vírgula)", type=["csv"])
         
         if arquivo_upload is not None:
             try:
-                # Lê tratando o separador do Excel nacional e acentuação
                 df_importado = pd.read_csv(arquivo_upload, sep=";", encoding="utf-8-sig")
-                
-                # Normaliza os nomes das colunas importadas tirando acentos para bater com o padrão
                 df_importado.columns = [col.replace("é", "e").replace("ó", "o").title() for col in df_importado.columns]
-                
                 colunas_obrigatorias = ["Data", "Debito", "Credito", "Valor", "Historico"]
                 
                 if all(col in df_importado.columns for col in colunas_obrigatorias):
@@ -182,7 +185,8 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
         with st.form("form_lancamento", clear_on_submit=True):
             col1, col2 = st.columns(2)
             data = col1.date_input("Data do Lançamento")
-            valor = col2.number_input("Valor (R$)", min_value=0.01, format="%.2f")
+            valor = col2.number_input("Valor (R$)", min_value=0.01, format="%,.2f")
+            
             c_debito = st.selectbox("Conta Débito (Entrada)", list(plano_de_contas.keys()), format_func=lambda x: f"{x} - {plano_de_contas[x]}")
             c_credito = st.selectbox("Conta Crédito (Origem)", list(plano_de_contas.keys()), format_func=lambda x: f"{x} - {plano_de_contas[x]}")
             historico = st.text_input("Histórico / Descrição da Operação")
@@ -191,7 +195,7 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
                 novo = {"Data": str(data), "Debito": c_debito, "Credito": c_credito, "Valor": valor, "Historico": historico}
                 st.session_state.livro_diario.append(novo)
                 salvar_dados(st.session_state.livro_diario)
-                st.success("Lançamento gravado com sucesso!")
+                st.success("Lançamento gravado com sucesso na nuvem!")
                 st.rerun()
 
         st.divider()
@@ -200,19 +204,16 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
             df_diario = pd.DataFrame(st.session_state.livro_diario)
             df_exibicao = df_diario.copy()
             
-            # Ajusta os nomes apenas visualmente na tabela do sistema para ficar bonito
             df_exibicao.columns = ["Data", "Débito", "Crédito", "Valor", "Histórico"]
             if "Valor" in df_exibicao.columns:
                 df_exibicao["Valor"] = df_exibicao["Valor"].apply(formatar_br)
             st.dataframe(df_exibicao, use_container_width=True)
             
-            # Exportação estruturada ideal para o Excel do Brasil (sem acentos nos cabeçalhos para evitar erros)
             df_exportar = df_diario[["Data", "Debito", "Credito", "Valor", "Historico"]].copy()
-            df_exportar.columns = ["Data", "Debito", "Credito", "Valor", "Historico"]
             csv = df_exportar.to_csv(index=False, sep=";", encoding="utf-8-sig").encode('utf-8-sig')
             st.download_button("📤 Exportar Lançamentos para Excel/CSV", data=csv, file_name="lancamentos_contabeis.csv", mime="text/csv")
         else:
-            st.info("Nenhum lançamento realizado ainda neste período.")
+            st.info("Nenhum lançamento armazenado na nuvem.")
 
     elif sub_menu == "📊 DRE":
         st.title("📊 Demonstrativo de Resultado do Exercício (DRE)")
@@ -250,8 +251,8 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
     st.title("🧮 Super Simulador Comparativo do Simples Nacional")
     
     col_in1, col_in2 = st.columns(2)
-    rbt12 = col_in1.number_input("Receita Acumulada nos últimos 12 meses (RBT12):", min_value=0.00, value=250000.00, format="%.2f")
-    faturamento_mes = col_in2.number_input("Faturamento Estimado para o Mês Atual:", min_value=0.00, value=20000.00, format="%.2f")
+    rbt12 = col_in1.number_input("Receita Acumulada nos últimos 12 meses (RBT12):", min_value=0.00, value=250000.00, format="%,.2f")
+    faturamento_mes = col_in2.number_input("Faturamento Estimado para o Mês Atual:", min_value=0.00, value=20000.00, format="%,.2f")
     
     tabelas_calculo = {k: list(v) for k, v in TABELAS_PADRAO.items()}
     resultados = []
