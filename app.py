@@ -385,8 +385,7 @@ elif st.session_state.pagina_selecionada == "📋 Módulo de Folha & Fator R":
             
             st.metric("Fator R Apurado", f"{fator_r_calculado:.2f}%")
             
-            ifator_r_calculado = fator_r_calculado
-            if ifator_r_calculado >= 28.0:
+            if fator_r_calculado >= 28.0:
                 st.success("🟢 **Empresa Enquadrada no Anexo III!** Devido à proporção da folha ser maior ou igual a 28%, a tributação da prestação de serviços iniciará em **6%** em vez de 15,5%.")
             else:
                 st.warning("🔴 **Empresa Enquadrada no Anexo V!** Como a proporção da folha está abaixo de 28%, a tributação iniciará na alíquota padrão de **15,50%**.")
@@ -398,85 +397,137 @@ elif st.session_state.pagina_selecionada == "📋 Módulo de Folha & Fator R":
             st.info("Insira um valor de faturamento acumulado válido para calcular o Fator R.")
             
     elif sub_aba_dp == "🧮 Simulador Prático de Salário Líquido (2026)":
-        st.subheader("Simulador de Folha de Pagamento - Competência 2026")
-        st.markdown("Cálculo integrado com os novos tetos de INSS e deduções de IRRF trazidas pela Lei nº 15.270/2025.")
+        st.subheader("Simulador de Folha de Pagamento & Férias - Competência 2026")
+        st.markdown("Cálculo integrado com os novos tetos de INSS, deduções legais e regras de férias.")
         
-        salario_bruto = st.number_input("Informe o Salário Bruto / Pró-Labore do Trabalhador (R$):", min_value=0.00, value=6500.00, step=100.00, format="%.2f")
+        # --- PAINEL DE ENTRADAS NA BARRA LATERAL (SIDEBAR) ---
+        st.sidebar.header("⚙️ Parâmetros do Trabalhador")
+        salario_bruto = st.sidebar.number_input("Salário Bruto / Pró-Labore (R$):", min_value=0.00, value=6500.00, step=100.00, format="%.2f")
+        num_dependentes = st.sidebar.number_input("Número de Dependentes:", min_value=0, value=0, step=1)
         
-        # --- CÁLCULO DO INSS PROGRESSIVO 2026 ---
-        inss_desconto = 0.0
-        # Definição das faixas da imagem fornecida
-        faixas_inss = [
-            (1621.00, 0.075, 0.00),
-            (2902.84, 0.090, 24.32),
-            (4354.27, 0.120, 111.40),
-            (8475.55, 0.140, 198.49)
+        st.sidebar.subheader("❌ Descontos Legais (Mensais)")
+        valor_faltas = st.sidebar.number_input("Valor de Faltas (R$):", min_value=0.00, value=0.00, step=50.00, format="%.2f")
+        valor_atrasos = st.sidebar.number_input("Valor de Atrasos/DSR (R$):", min_value=0.00, value=0.00, step=10.00, format="%.2f")
+        
+        st.sidebar.subheader("🏖️ Opções de Férias")
+        calcular_ferias = st.sidebar.checkbox("Simular Recibo de Férias?")
+        
+        if calcular_ferias:
+            dias_gozo = st.sidebar.slider("Dias de Férias a Gozar:", min_value=10, max_value=30, value=30)
+            abono_pecuniario = st.sidebar.checkbox("Vender 1/3 das Férias (Abono Pecuniário)?")
+            adianta_13 = st.sidebar.checkbox("Adiantar 1ª Parcela do 13º?")
+        
+        # --- AJUSTE DO SALÁRIO PELOS DESCONTOS DE FALTAS/ATRASOS ---
+        total_descontos_legais = valor_faltas + valor_atrasos
+        salario_sujeito_encargos = max(0.0, salario_bruto - total_descontos_legais)
+        
+        # --- FUNÇÃO INTERNA PARA CÁLCULO DE INSS (PROGRESSIVO 2026) ---
+        def calcular_inss_2026(valor_base):
+            teto_inss = 8475.55
+            salario_calculo_inss = min(valor_base, teto_inss)
+            if salario_calculo_inss <= 1621.00:
+                return salario_calculo_inss * 0.075
+            elif salario_calculo_inss <= 2902.84:
+                return (salario_calculo_inss * 0.090) - 24.32
+            elif salario_calculo_inss <= 4354.27:
+                return (salario_calculo_inss * 0.120) - 111.40
+            else:
+                return (salario_calculo_inss * 0.140) - 198.49
+
+        # --- FUNÇÃO INTERNA PARA CÁLCULO DE IRRF (LEI Nº 15.270/2025) ---
+        def calcular_irrf_2026(valor_base, inss_retido, dependentes):
+            deducao_dependentes = dependentes * 189.59
+            base_irrf = max(0.0, valor_base - inss_retido - deducao_dependentes)
+            
+            if base_irrf <= 2259.20:
+                irrf_bruto = 0.0
+            elif base_irrf <= 2826.65:
+                irrf_bruto = (base_irrf * 0.075) - 169.44
+            elif base_irrf <= 3751.05:
+                irrf_bruto = (base_irrf * 0.150) - 381.44
+            elif base_irrf <= 4664.68:
+                irrf_bruto = (base_irrf * 0.225) - 662.77
+            else:
+                irrf_bruto = (base_irrf * 0.275) - 896.00
+                
+            # Redução Mensal (Lei nº 15.270/2025)
+            if base_irrf <= 5000.00:
+                reducao = min(irrf_bruto, 312.89)
+            elif base_irrf <= 7350.00:
+                reducao = max(0.0, 978.62 - (0.133145 * base_irrf))
+            else:
+                reducao = 0.0
+                
+            return max(0.0, irrf_bruto - reducao), base_irrf, reducao
+
+        # --- FLUXO 1: CÁLCULO DO MÓDULO DE FÉRIAS ---
+        if calcular_ferias:
+            st.subheader("🏖️ Demonstrativo de Recibo de Férias")
+            
+            # Ajuste de dias caso haja abono pecuniário (venda de 10 dias)
+            dias_faturamento_ferias = 20 if abono_pecuniario else dias_gozo
+            
+            valor_ferias_gozadas = (salario_bruto / 30) * dias_faturamento_ferias
+            terco_constitucional = valor_ferias_gozadas / 3
+            
+            # Verbas indenizatórias (não incidem INSS/IRRF)
+            valor_abono = (salario_bruto / 30) * 10 if abono_pecuniario else 0.0
+            terco_abono = valor_abono / 3 if abono_pecuniario else 0.0
+            adiantamento_13o_valor = (salario_bruto / 2) if adianta_13 else 0.0
+            
+            # Base de cálculo de tributos sobre as férias gozadas
+            base_tributavel_ferias = valor_ferias_gozadas + terco_constitucional
+            
+            inss_ferias = calcular_inss_2026(base_tributavel_ferias)
+            irrf_ferias, base_irrf_fer, red_irrf_fer = calcular_irrf_2026(base_tributavel_ferias, inss_ferias, num_dependentes)
+            
+            total_proventos_ferias = valor_ferias_gozadas + terco_constitucional + valor_abono + terco_abono + adiantamento_13o_valor
+            total_descontos_ferias = inss_ferias + irrf_ferias
+            liquido_ferias = total_proventos_ferias - total_descontos_ferias
+            
+            df_ferias = pd.DataFrame([
+                {"Evento / Rubrica": f"🟢 Férias Gozadas ({dias_faturamento_ferias} dias)", "Tipo": "Provento", "Valor": formatar_br(valor_ferias_gozadas)},
+                {"Evento / Rubrica": "🟢 1/3 Constitucional de Férias", "Tipo": "Provento", "Valor": formatar_br(terco_constitucional)},
+                {"Evento / Rubrica": "🟢 Abono Pecuniário (10 dias vendidos)", "Tipo": "Indenização", "Valor": formatar_br(valor_abono)},
+                {"Evento / Rubrica": "🟢 1/3 Constitucional sobre Abono", "Tipo": "Indenização", "Valor": formatar_br(terco_abono)},
+                {"Evento / Rubrica": "🟢 Adiantamento da 1ª Parcela do 13º", "Tipo": "Adiantamento", "Valor": formatar_br(adiantamento_13o_valor)},
+                {"Evento / Rubrica": "🔴 Desconto INSS sobre Férias", "Tipo": "Desconto", "Valor": formatar_br(-inss_ferias)},
+                {"Evento / Rubrica": "🔴 Desconto IRRF sobre Férias", "Tipo": "Desconto", "Valor": formatar_br(-irrf_ferias)},
+                {"Evento / Rubrica": "💰 VALOR LÍQUIDO DE FÉRIAS A RECEBER", "Tipo": "Totalizador", "Valor": formatar_br(liquido_ferias)},
+            ])
+            df_ferias = df_ferias[df_ferias["Valor"] != formatar_br(0.0)] # Remove linhas zeradas
+            st.table(df_ferias)
+
+        # --- FLUXO 2: CÁLCULO DA FOLHA DE PAGAMENTO MENSAL ---
+        inss_desconto = calcular_inss_2026(salario_sujeito_encargos)
+        irrf_final, base_irrf, reducao_imposto = calcular_irrf_2026(salario_sujeito_encargos, inss_desconto, num_dependentes)
+        salario_liquido = salario_sujeito_encargos - inss_desconto - irrf_final
+        
+        st.subheader("📋 Demonstrativo de Pagamento Mensal Emitido")
+        
+        # Montagem dinâmica da tabela com os novos descontos de faltas/atrasos e dependentes
+        linhas_holerite = [
+            {"Evento / Rubrica": "🟢 Salário Base / Bruto", "Tipo": "Provento", "Valor": formatar_br(salario_bruto)}
         ]
         
-        teto_inss = 8475.55
-        salario_calculo_inss = min(salario_bruto, teto_inss)
-        
-        # Lógica Progressiva de Enquadramento por Faixa
-        if salario_calculo_inss <= 1621.00:
-            inss_desconto = salario_calculo_inss * 0.075
-        elif salario_calculo_inss <= 2902.84:
-            inss_desconto = (salario_calculo_inss * 0.090) - 24.32
-        elif salario_calculo_inss <= 4354.27:
-            inss_desconto = (salario_calculo_inss * 0.120) - 111.40
-        else:
-            inss_desconto = (salario_calculo_inss * 0.140) - 198.49
+        if valor_faltas > 0:
+            linhas_holerite.append({"Evento / Rubrica": "🔴 Desconto de Faltas Justificadas/Injustificadas", "Tipo": "Desconto", "Valor": formatar_br(-valor_faltas)})
+        if valor_atrasos > 0:
+            linhas_holerite.append({"Evento / Rubrica": "🔴 Desconto de Atrasos / DSR", "Tipo": "Desconto", "Valor": formatar_br(-valor_atrasos)})
             
-        # --- CÁLCULO DO IRRF PROGRESSIVO 2026 COM REDUÇÃO ---
-        base_irrf = max(0.0, salario_bruto - inss_desconto)
-        
-        # Tabela Padrão Geral Histórica Simulada para 2026 (Base de Cálculo IRRF)
-        # Utilizando faixas convencionais apenas como referência para base de cálculo antes da dedução regional
-        irrf_bruto = 0.0
-        if base_irrf <= 2259.20:
-            irrf_bruto = 0.0
-        elif base_irrf <= 2826.65:
-            irrf_bruto = (base_irrf * 0.075) - 169.44
-        elif base_irrf <= 3751.05:
-            irrf_bruto = (base_irrf * 0.150) - 381.44
-        elif base_irrf <= 4664.68:
-            irrf_bruto = (base_irrf * 0.225) - 662.77
-        else:
-            irrf_bruto = (base_irrf * 0.275) - 896.00
-            
-        # --- REDUÇÃO MENSAL (LEI Nº 15.270/2025) conforme imagem ---
-        reducao_imposto = 0.0
-        rendimentos_tributaveis = base_irrf # Base líquida após INSS sujeita a retenção
-        
-        if rendimentos_tributaveis <= 5000.00:
-            # Até 5000,00 a redução é de até R$ 312,89 extinguindo o imposto devido
-            reducao_imposto = min(irrf_bruto, 312.89)
-        elif rendimentos_tributaveis <= 7350.00:
-            # Fórmula linear exata extraída da imagem fornecida: 978.62 - (0.133145 * rendimentos)
-            reducao_calculada = 978.62 - (0.133145 * rendimentos_tributaveis)
-            reducao_imposto = max(0.0, reducao_calculada)
-        else:
-            reducao_imposto = 0.0
-            
-        irrf_final = max(0.0, irrf_bruto - reducao_imposto)
-        salario_liquido = salario_bruto - inss_desconto - irrf_final
-        
-        # Exibição do Contracheque/Holerite Simulado
-        st.subheader("📋 Demonstrativo de Pagamento Emitido")
-        
-        df_holerite = pd.DataFrame([
-            {"Evento / Rubrica": "🟢 Salário Base / Bruto", "Tipo": "Provento", "Valor": formatar_br(salario_bruto)},
+        linhas_holerite.extend([
             {"Evento / Rubrica": "🔴 Desconto INSS Previdenciário", "Tipo": "Desconto", "Valor": formatar_br(-inss_desconto)},
-            {"Evento / Rubrica": "⚪ Base de Cálculo Líquida para o IRRF", "Tipo": "Informativo", "Valor": formatar_br(base_irrf)},
-            {"Evento / Rubrica": "🔵 IRRF Calculado (Antes da Redução)", "Tipo": "Informativo", "Valor": formatar_br(irrf_bruto)},
+            {"Evento / Rubrica": f"⚪ Base de Cálculo Líquida do IRRF ({num_dependentes} dep.)", "Tipo": "Informativo", "Valor": formatar_br(base_irrf)},
             {"Evento / Rubrica": "🟢 Redução de IRRF (Lei nº 15.270/2025)", "Tipo": "Benefício", "Valor": formatar_br(reducao_imposto)},
             {"Evento / Rubrica": "🔴 Desconto IRRF Efetivo Retido", "Tipo": "Desconto", "Valor": formatar_br(-irrf_final)},
-            {"Evento / Rubrica": "💰 SALÁRIO LÍQUIDO A RECEBER", "Tipo": "Totalizador", "Valor": formatar_br(salario_liquido)},
+            {"Evento / Rubrica": "💰 SALÁRIO LÍQUIDO MENSAL A RECEBER", "Tipo": "Totalizador", "Valor": formatar_br(salario_liquido)},
         ])
         
+        df_holerite = pd.DataFrame(linhas_holerite)
         st.table(df_holerite)
         
         # Cards Rápidos Informativos
         col_c1, col_c2, col_c3 = st.columns(3)
-        col_c1.metric("Total Descontado", formatar_br(inss_desconto + irrf_final))
-        col_c2.metric("Alíquota Efetiva de INSS", f"{(inss_desconto / salario_bruto * 100) if salario_bruto > 0 else 0:.2f}%")
+        col_c1.metric("Total Descontado (Folha)", formatar_br(inss_desconto + irrf_final + total_descontos_legais))
+        col_c2.metric("Alíquota Efetiva de INSS", f"{(inss_desconto / salario_sujeito_encargos * 100) if salario_sujeito_encargos > 0 else 0:.2f}%")
         col_c3.metric("IRRF Retido Final", formatar_br(irrf_final))
