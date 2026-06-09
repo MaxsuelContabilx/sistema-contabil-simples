@@ -1,14 +1,18 @@
 import streamlit as st
 import pandas as pd
 import os
+import base64
+from datetime import datetime
 
 # Configuração da Página
 st.set_page_config(page_title="Maxsuel Contabilidade - Gestão e Estratégia", layout="wide")
 
 # URL da sua planilha vinda dos Secrets
-URL_PLANILHA = st.secrets["SPREADSHEET_URL"]
+URL_PLANILHA = st.secrets["SPREADSHEET_URL"] if "SPREADSHEET_URL" in st.secrets else ""
 
 def carregar_dados():
+    if not URL_PLANILHA:
+        return []
     try:
         # Transforma o link normal em um link de exportação direta em CSV para o Pandas ler
         url_csv = URL_PLANILHA.replace("/edit", "/export?format=csv")
@@ -31,12 +35,10 @@ def carregar_dados():
             })
         return dados_formatados
     except Exception as e:
-        # Se a planilha estiver vazia no Google, inicia o app zerado sem travar a tela
         return []
 
 def salvar_dados(dados):
     colunas_oficiais = ["Nº Lançamento", "Data", "Débito", "Crédito", "Valor", "Histórico"]
-    
     if len(dados) == 0:
         df = pd.DataFrame(columns=colunas_oficiais)
     else:
@@ -54,7 +56,7 @@ def salvar_dados(dados):
         df = df[colunas_oficiais]
     pass
 
-# Inicializa o estado do livro diário buscando os dados atuais da sua planilha
+# Inicializa o estado do livro diário
 if 'livro_diario' not in st.session_state:
     st.session_state.livro_diario = carregar_dados()
 
@@ -65,6 +67,13 @@ def formatar_br(valor):
         return "R$ " + val_formatado.replace(",", "X").replace(".", ",").replace("X", ".")
     except:
         return "R$ 0,00"
+
+# --- FUNÇÃO PARA CONVERTER IMAGEM LOCAL PARA BASE64 (USADO NA IMPRESSÃO) ---
+def obter_logo_base64(caminho_img):
+    if os.path.exists(caminho_img):
+        with open(caminho_img, "rb") as image_file:
+            return base64.b64encode(image_file.read()).decode('utf-8')
+    return None
 
 # --- CONTROLADOR DE NAVEGAÇÃO INTERNA ---
 opcoes_menu = [
@@ -79,7 +88,9 @@ if 'pagina_selecionada' not in st.session_state:
 
 # --- BARRA LATERAL ---
 nome_logo = "Logo - Empresa Max contabil_2.png"
-if os.path.exists(nome_logo):
+logo_base64 = obter_logo_base64(nome_logo)
+
+if logo_base64:
     st.sidebar.image(nome_logo, use_container_width=True)
 else:
     st.sidebar.markdown("<h2 style='text-align: center; color: #0f2a4a;'>MAXSUEL</h2>", unsafe_allow_html=True)
@@ -98,21 +109,11 @@ if opcao_menu != st.session_state.pagina_selecionada:
     st.session_state.pagina_selecionada = opcao_menu
     st.rerun()
 
-# --- PLANO DE CONTAS (Chaves corrigidas e únicas) ---
+# --- PLANO DE CONTAS ---
 plano_de_contas = {
-    "1.01": "Caixa/Banco", 
-    "1.02": "Estoque",
-    "1.03": "Clientes a Receber",
-    "1.04": "Imobilizado",
-    "2.01": "Fornecedores",
-    "2.02": "Provisões",
-    "2.03": "Empréstimos", 
-    "2.04": "Capital Social", 
-    "2.05": "Lucros Acumulados",
-    "4.01": "Receita de Vendas", 
-    "5.01": "Despesas", 
-    "6.01": "Impostos", 
-    "7.01": "ARE"
+    "1.01": "Caixa/Banco", "1.02": "Estoque", "1.03": "Clientes a Receber", "1.04": "Imobilizado",
+    "2.01": "Fornecedores", "2.02": "Provisões", "2.03": "Empréstimos", "2.04": "Capital Social", "2.05": "Lucros Acumulados",
+    "4.01": "Receita de Vendas", "5.01": "Despesas", "6.01": "Impostos", "7.01": "ARE"
 }
 
 # TABELAS OFICIAIS DO SIMPLES NACIONAL
@@ -139,7 +140,6 @@ def calcular_saldos():
             d = str(l.get("Debito", ""))
             c = str(l.get("Credito", ""))
             v = float(l.get("Valor", 0.0))
-            
             if d in saldos:
                 if d.startswith(('1', '5', '6')): saldos[d] += v
                 else: saldos[d] -= v
@@ -153,6 +153,26 @@ def calcular_saldos():
 saldos = calcular_saldos()
 lucro = (saldos.get("4.01", 0.0)) - (saldos.get("5.01", 0.0) + saldos.get("6.01", 0.0))
 
+# Injeta CSS Global para unificar os botões aos cards HTML do menu principal
+st.markdown("""
+<style>
+    .custom-card-btn button {
+        border-radius: 0px 0px 10px 10px !important;
+        border: 1px solid #ddd !important;
+        border-top: none !important;
+        padding: 10px !important;
+        height: 45px !important;
+        background-color: #ffffff !important;
+        transition: all 0.3s ease;
+    }
+    .custom-card-btn button:hover {
+        background-color: #f1f5f9 !important;
+        color: #0f2a4a !important;
+        box-shadow: 0px 4px 6px rgba(0,0,0,0.05);
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # ==============================================================================
 # TELA 1: MENU PRINCIPAL
 # ==============================================================================
@@ -165,36 +185,42 @@ if st.session_state.pagina_selecionada == "🏠 Menu Principal":
     
     with col_card1:
         st.markdown("""
-        <div style="background-color: #f0f4f8; padding: 25px; border-radius: 10px; border-left: 5px solid #0f2a4a; min-height: 200px;">
+        <div style="background-color: #f0f4f8; padding: 25px; border-radius: 10px 10px 0px 0px; border-left: 5px solid #0f2a4a; min-height: 180px; border-top: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0;">
             <h3 style="color: #0f2a4a; margin-top:0;">💻 Módulo Contábil Comercial</h3>
-            <p style="color: #333;">Realize partidas dobradas do livro diário, gere relatórios de DRE e acompanhe o fechamento do seu Balanço Patrimonial em tempo real.</p>
+            <p style="color: #333; font-size: 14px;">Realize partidas dobradas do livro diário, gere relatórios de DRE e acompanhe o fechamento do seu Balanço Patrimonial em tempo real.</p>
         </div>
         """, unsafe_allow_html=True)
+        st.markdown('<div class="custom-card-btn">', unsafe_allow_html=True)
         if st.button("Acessar Contabilidade ➡️", use_container_width=True, key="btn_contabil"):
             st.session_state.pagina_selecionada = "💻 Módulo Contábil"
             st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
             
     with col_card2:
         st.markdown("""
-        <div style="background-color: #fffde6; padding: 25px; border-radius: 10px; border-left: 5px solid #d4af37; min-height: 200px;">
+        <div style="background-color: #fffde6; padding: 25px; border-radius: 10px 10px 0px 0px; border-left: 5px solid #d4af37; min-height: 180px; border-top: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0;">
             <h3 style="color: #6b5300; margin-top:0;">🧮 Inteligência do Simples Nacional</h3>
-            <p style="color: #333;">Simule e compare simultaneamente a carga tributária dos Anexos I, II, III, IV e V. Faça simulações e descubra o rateio exato por imposto.</p>
+            <p style="color: #333; font-size: 14px;">Simule e compare simultaneamente a carga tributária dos Anexos I, II, III, IV e V. Faça simulações e descubra o rateio exato por imposto.</p>
         </div>
         """, unsafe_allow_html=True)
+        st.markdown('<div class="custom-card-btn">', unsafe_allow_html=True)
         if st.button("Acessar Simulador Tributário ➡️", use_container_width=True, key="btn_simulador"):
             st.session_state.pagina_selecionada = "🧮 Simulador Simples Nacional"
             st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
     with col_card3:
         st.markdown("""
-        <div style="background-color: #f3fcf2; padding: 25px; border-radius: 10px; border-left: 5px solid #2e7d32; min-height: 200px;">
+        <div style="background-color: #f3fcf2; padding: 25px; border-radius: 10px 10px 0px 0px; border-left: 5px solid #2e7d32; min-height: 180px; border-top: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0;">
             <h3 style="color: #1b5e20; margin-top:0;">📋 Folha de Pagamento & Fator R</h3>
-            <p style="color: #333;">Calcule o salário líquido de funcionários para 2026 com regras de INSS/IRRF e monitore o enquadramento estratégico do Fator R.</p>
+            <p style="color: #333; font-size: 14px;">Calcule o salário líquido de funcionários para 2026 com regras de INSS/IRRF e monitore o enquadramento estratégico do Fator R.</p>
         </div>
         """, unsafe_allow_html=True)
+        st.markdown('<div class="custom-card-btn">', unsafe_allow_html=True)
         if st.button("Acessar Módulo de Folha ➡️", use_container_width=True, key="btn_folha_v"):
             st.session_state.pagina_selecionada = "📋 Módulo de Folha & Fator R"
             st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
 # ==============================================================================
 # TELA 2: MÓDULO CONTÁBIL
@@ -204,7 +230,6 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
 
     if sub_menu == "📝 Lançamentos":
         st.title("📝 Livro Diário de Lançamentos")
-        
         st.subheader("📥 Importar Lançamentos via CSV")
         arquivo_upload = st.file_uploader("Selecione seu arquivo CSV exportado do Excel (Separado por ponto e vírgula)", type=["csv"])
         
@@ -256,7 +281,6 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
         if len(st.session_state.livro_diario) > 0:
             df_diario = pd.DataFrame(st.session_state.livro_diario)
             df_exibicao = df_diario.copy()
-            
             df_exibicao.columns = ["Nº Lançamento", "Data", "Débito", "Crédito", "Valor", "Histórico"]
             
             if "Valor" in df_exibicao.columns:
@@ -351,9 +375,11 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
     st.subheader("🔀 Detalhamento e Rateio Interno dos Impostos")
     anexo_detalhe = st.selectbox("Escolha um Anexo para enxergar a divisão da guia do imposto:", list(TABELAS_PADRAO.keys()))
     
+    df_rateio_impressao = pd.DataFrame()
     if anexo_detalhe in detalhes_impostos:
         dict_impostos = detalhes_impostos[anexo_detalhe]
         df_rateio = pd.DataFrame([{"Imposto": k, "Valor Destinado": v} for k, v in dict_impostos.items() if v > 0])
+        df_rateio_impressao = df_rateio.copy()
         
         col_graf1, col_graf2 = st.columns([1, 1])
         with col_graf1:
@@ -363,9 +389,123 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
         with col_graf2:
             st.bar_chart(df_rateio.set_index("Imposto"))
 
+    # ==============================================================================
+    # EXPORTAÇÃO E IMPRESSÃO COM LOGO (HTML IMPRIMÍVEL AUTOMÁTICO)
+    # ==============================================================================
+    st.divider()
+    st.subheader("🖨️ Imprimir Simulação")
+    
+    # Construção do documento HTML customizado para impressão
+    html_linhas_tabela = ""
+    for r in resultados:
+        imp_v = formatar_br(r["Imposto Mensal"]) if isinstance(r["Imposto Mensal"], (int, float)) else r["Imposto Mensal"]
+        html_linhas_tabela += f"<tr><td>{r['Anexo']}</td><td>{r['Alíquota Nominal']}</td><td>{r['Alíquota Efetiva Real']}</td><td><b>{imp_v}</b></td></tr>"
+        
+    html_linhas_rateio = ""
+    if not df_rateio_impressao.empty:
+        for idx, row in df_rateio_impressao.iterrows():
+            html_linhas_rateio += f"<tr><td>{row['Imposto']}</td><td>{formatar_br(row['Valor Destinado'])}</td></tr>"
+
+    logo_tag = f'<img class="logo" src="data:image/png;base64,{logo_base64}">' if logo_base64 else '<h2 style="color: #0f2a4a; margin:0;">MAXSUEL CONTABILIDADE</h2>'
+    data_atual = datetime.now().strftime("%d/%m/%Y às %H:%M")
+
+    html_template = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <title>Simulação Simples Nacional - Maxsuel Contabilidade</title>
+        <style>
+            body {{ font-family: 'Segoe UI', Arial, sans-serif; margin: 40px; color: #333; line-height: 1.5; }}
+            .header {{ display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #0f2a4a; padding-bottom: 15px; margin-bottom: 30px; }}
+            .logo {{ max-height: 75px; max-width: 220px; object-fit: contain; }}
+            .header-info {{ text-align: right; font-size: 13px; color: #666; }}
+            .title {{ color: #0f2a4a; font-size: 24px; font-weight: bold; margin: 0 0 5px 0; }}
+            .subtitle {{ color: #555; font-size: 15px; margin: 0; }}
+            .section-title {{ color: #0f2a4a; font-size: 16px; font-weight: bold; margin-top: 30px; margin-bottom: 12px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }}
+            .grid-params {{ display: flex; gap: 40px; background: #f8fafc; padding: 15px; border-radius: 6px; margin-bottom: 25px; border: 1px solid #e2e8f0; }}
+            .param-item {{ font-size: 14px; }}
+            table {{ width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 14px; }}
+            th, td {{ border: 1px solid #cbd5e1; padding: 10px 12px; text-align: left; }}
+            th {{ background-color: #0f2a4a; color: white; font-weight: 600; }}
+            tr:nth-child(even) {{ background-color: #f8fafc; }}
+            .footer {{ margin-top: 50px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 15px; }}
+            @media print {{
+                .btn-print {{ display: none; }}
+                body {{ margin: 20px; }}
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <div>
+                <h1 class="title">Maxsuel Contabilidade</h1>
+                <p class="subtitle">Relatório Estratégico de Planejamento Tributário</p>
+            </div>
+            <div>{logo_tag}</div>
+        </div>
+        
+        <div class="header-info">
+            Emitido em: {data_atual} | Competência Fiscal: 2026
+        </div>
+
+        <div class="section-title">Parâmetros de Entrada Aplicados</div>
+        <div class="grid-params">
+            <div class="param-item"><b>Receita Acumulada (RBT12):</b> {formatar_br(rbt12)}</div>
+            <div class="param-item"><b>Faturamento Projetado para o Mês:</b> {formatar_br(faturamento_mes)}</div>
+        </div>
+
+        <div class="section-title">Painel Comparativo de Cenários (Simples Nacional)</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Anexo Fiscal</th>
+                    <th>Alíquota Nominal</th>
+                    <th>Alíquota Efetiva Real</th>
+                    <th>Imposto Mensal Apurado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {html_linhas_tabela}
+            </tbody>
+        </table>
+
+        <div class="section-title">Detalhamento de Rateio Interno da Guia - {anexo_detalhe}</div>
+        <table style="max-width: 500px;">
+            <thead>
+                <tr>
+                    <th>Imposto / Ente Federativo</th>
+                    <th>Valor Destinado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {html_linhas_rateio}
+            </tbody>
+        </table>
+
+        <div class="footer">
+            Hub de Soluções Contábeis Maxsuel © 2026 - Documento gerado eletronicamente para suporte decisório estratégico.
+        </div>
+        
+        <script>
+            // Aciona automaticamente a janela de impressão ao abrir o arquivo externo
+            window.onload = function() {{ window.print(); }}
+        </script>
+    </body>
+    </html>
+    """
+
+    st.info("Clique no botão abaixo para gerar o arquivo de impressão. O relatório virá com a sua logomarca oficial e abrirá a tela de impressão do seu computador automaticamente.")
+    st.download_button(
+        label="🖨️ Baixar e Imprimir Relatório Fiscal",
+        data=html_template,
+        file_name=f"Simulacao_Simples_Nacional_{datetime.now().strftime('%Y%m%d')}.html",
+        mime="text/html",
+        use_container_width=True
+    )
+
 # ==============================================================================
-# TELA 4: MÓDULO DE FOLHA & FATOR R (NOVA TELA ACESSADA)
-# ==============================================================================
+# TELA 4: MÓDULO DE FOLHA & FATOR R
 # ==============================================================================
 elif st.session_state.pagina_selecionada == "📋 Módulo de Folha & Fator R":
     st.title("📋 Painel Estratégico de DP: Folha & Fator R")
@@ -383,7 +523,6 @@ elif st.session_state.pagina_selecionada == "📋 Módulo de Folha & Fator R":
         
         if faturamento_acumulado > 0:
             fator_r_calculado = (folha_acumulada / faturamento_acumulado) * 100
-            
             st.metric("Fator R Apurado", f"{fator_r_calculado:.2f}%")
             
             if fator_r_calculado >= 28.0:
@@ -391,7 +530,6 @@ elif st.session_state.pagina_selecionada == "📋 Módulo de Folha & Fator R":
             else:
                 st.warning("🔴 **Empresa Enquadrada no Anexo V!** Como a proporção da folha está abaixo de 28%, a tributação iniciará na alíquota padrão de **15,50%**.")
                 
-            # Exibe barra visual de progresso até a meta de 28%
             progresso = min(1.0, float(fator_r_calculado / 28.0))
             st.progress(progresso, text=f"Proporção da meta legal (Mínimo 28%): {fator_r_calculado:.2f}% / 28,00%")
         else:
@@ -401,7 +539,6 @@ elif st.session_state.pagina_selecionada == "📋 Módulo de Folha & Fator R":
         st.subheader("Simulador de Folha de Pagamento & Férias - Competência 2026")
         st.markdown("Cálculo integrado com os novos tetos de INSS, deduções legais e regras de férias.")
         
-        # --- PAINEL DE ENTRADAS NA BARRA LATERAL (SIDEBAR) ---
         st.sidebar.header("⚙️ Parâmetros do Trabalhador")
         salario_bruto = st.sidebar.number_input("Salário Bruto / Pró-Labore (R$):", min_value=0.00, value=6500.00, step=100.00, format="%.2f")
         num_dependentes = st.sidebar.number_input("Número de Dependentes:", min_value=0, value=0, step=1)
@@ -423,53 +560,35 @@ elif st.session_state.pagina_selecionada == "📋 Módulo de Folha & Fator R":
             abono_pecuniario = st.sidebar.checkbox("Vender 1/3 das Férias (Abono Pecuniário)?")
             adianta_13 = st.sidebar.checkbox("Adiantar 1ª Parcela do 13º?")
         
-        # --- AJUSTE DO SALÁRIO PELOS DESCONTOS DE FALTAS/ATRASOS ---
         total_descontos_legais = valor_faltas + valor_atrasos
         salario_sujeito_encargos = max(0.0, salario_bruto - total_descontos_legais)
         
-        # --- FUNÇÃO INTERNA PARA CÁLCULO DE INSS (PROGRESSIVO 2026) ---
         def calcular_inss_2026(valor_base):
             teto_inss = 8475.55
             salario_calculo_inss = min(valor_base, teto_inss)
-            if salario_calculo_inss <= 1621.00:
-                return salario_calculo_inss * 0.075
-            elif salario_calculo_inss <= 2902.84:
-                return (salario_calculo_inss * 0.090) - 24.32
-            elif salario_calculo_inss <= 4354.27:
-                return (salario_calculo_inss * 0.120) - 111.40
-            else:
-                return (salario_calculo_inss * 0.140) - 198.49
+            if salario_calculo_inss <= 1621.00: return salario_calculo_inss * 0.075
+            elif salario_calculo_inss <= 2902.84: return (salario_calculo_inss * 0.090) - 24.32
+            elif salario_calculo_inss <= 4354.27: return (salario_calculo_inss * 0.120) - 111.40
+            else: return (salario_calculo_inss * 0.140) - 198.49
 
-        # --- FUNÇÃO INTERNA PARA CÁLCULO DE IRRF (LEI Nº 15.270/2025) ---
         def calcular_irrf_2026(valor_base, inss_retido, dependentes):
             deducao_dependentes = dependentes * 189.59
             base_irrf = max(0.0, valor_base - inss_retido - deducao_dependentes)
             
-            if base_irrf <= 2259.20:
-                irrf_bruto = 0.0
-            elif base_irrf <= 2826.65:
-                irrf_bruto = (base_irrf * 0.075) - 169.44
-            elif base_irrf <= 3751.05:
-                irrf_bruto = (base_irrf * 0.150) - 381.44
-            elif base_irrf <= 4664.68:
-                irrf_bruto = (base_irrf * 0.225) - 662.77
-            else:
-                irrf_bruto = (base_irrf * 0.275) - 896.00
+            if base_irrf <= 2259.20: irrf_bruto = 0.0
+            elif base_irrf <= 2826.65: irrf_bruto = (base_irrf * 0.075) - 169.44
+            elif base_irrf <= 3751.05: irrf_bruto = (base_irrf * 0.150) - 381.44
+            elif base_irrf <= 4664.68: irrf_bruto = (base_irrf * 0.225) - 662.77
+            else: irrf_bruto = (base_irrf * 0.275) - 896.00
                 
-            # Redução Mensal (Lei nº 15.270/2025)
-            if base_irrf <= 5000.00:
-                reducao = min(irrf_bruto, 312.89)
-            elif base_irrf <= 7350.00:
-                reducao = max(0.0, 978.62 - (0.133145 * base_irrf))
-            else:
-                reducao = 0.0
+            if base_irrf <= 5000.00: reducao = min(irrf_bruto, 312.89)
+            elif base_irrf <= 7350.00: reducao = max(0.0, 978.62 - (0.133145 * base_irrf))
+            else: reducao = 0.0
                 
             return max(0.0, irrf_bruto - reducao), base_irrf, reducao
 
-        # --- FLUXO 1: CÁLCULO DO MÓDULO DE FÉRIAS ---
         if calcular_ferias:
             st.subheader("🏖️ Demonstrativo de Recibo de Férias")
-            
             dias_faturamento_ferias = 20 if abono_pecuniario else dias_gozo
             
             valor_ferias_gozadas = (salario_bruto / 30) * dias_faturamento_ferias
@@ -480,7 +599,6 @@ elif st.session_state.pagina_selecionada == "📋 Módulo de Folha & Fator R":
             adiantamento_13o_valor = (salario_bruto / 2) if adianta_13 else 0.0
             
             base_tributavel_ferias = valor_ferias_gozadas + terco_constitucional
-            
             inss_ferias = calcular_inss_2026(base_tributavel_ferias)
             irrf_ferias, base_irrf_fer, red_irrf_fer = calcular_irrf_2026(base_tributavel_ferias, inss_ferias, num_dependentes)
             
@@ -501,21 +619,15 @@ elif st.session_state.pagina_selecionada == "📋 Módulo de Folha & Fator R":
             df_ferias = df_ferias[df_ferias["Valor"] != formatar_br(0.0)]
             st.table(df_ferias)
 
-        # --- FLUXO 2: CÁLCULO DA FOLHA DE PAGAMENTO MENSAL ---
         inss_desconto = calcular_inss_2026(salario_sujeito_encargos)
         irrf_final, base_irrf, reducao_imposto = calcular_irrf_2026(salario_sujeito_encargos, inss_desconto, num_dependentes)
         salario_liquido = salario_sujeito_encargos - inss_desconto - irrf_final
         
         st.subheader("📋 Demonstrativo de Pagamento Mensal Emitido")
+        linhas_holerite = [{"Evento / Rubrica": "🟢 Salário Base / Bruto", "Tipo": "Provento", "Valor": formatar_br(salario_bruto)}]
         
-        linhas_holerite = [
-            {"Evento / Rubrica": "🟢 Salário Base / Bruto", "Tipo": "Provento", "Valor": formatar_br(salario_bruto)}
-        ]
-        
-        if valor_faltas > 0:
-            linhas_holerite.append({"Evento / Rubrica": "🔴 Desconto de Faltas", "Tipo": "Desconto", "Valor": formatar_br(-valor_faltas)})
-        if valor_atrasos > 0:
-            linhas_holerite.append({"Evento / Rubrica": "🔴 Desconto de Atrasos / DSR", "Tipo": "Desconto", "Valor": formatar_br(-valor_atrasos)})
+        if valor_faltas > 0: linhas_holerite.append({"Evento / Rubrica": "🔴 Desconto de Faltas", "Tipo": "Desconto", "Valor": formatar_br(-valor_faltas)})
+        if valor_atrasos > 0: linhas_holerite.append({"Evento / Rubrica": "🔴 Desconto de Atrasos / DSR", "Tipo": "Desconto", "Valor": formatar_br(-valor_atrasos)})
             
         linhas_holerite.extend([
             {"Evento / Rubrica": "🔴 Desconto INSS Previdenciário", "Tipo": "Desconto", "Valor": formatar_br(-inss_desconto)},
@@ -528,12 +640,9 @@ elif st.session_state.pagina_selecionada == "📋 Módulo de Folha & Fator R":
         df_holerite = pd.DataFrame(linhas_holerite)
         st.table(df_holerite)
         
-        # --- TOTALIZADOR CONSOLIDADO (SOMA DE MÊS + FÉRIAS) ---
         if calcular_ferias:
             st.divider()
             st.subheader("💰 Resumo Consolidado de Recebimentos")
-            st.markdown("Valores acumulados que serão disponibilizados ao colaborador (Folha Mensal + Recibo de Férias):")
-            
             total_liquido_geral = salario_liquido + liquido_ferias
             
             col_g1, col_g2, col_g3 = st.columns(3)
@@ -542,7 +651,6 @@ elif st.session_state.pagina_selecionada == "📋 Módulo de Folha & Fator R":
             col_g3.metric("TOTAL LÍQUIDO CONSOLIDADO", formatar_br(total_liquido_geral), delta="Mês + Férias", delta_color="inverse")
             st.divider()
         else:
-            # Cards originais simplificados caso não simule férias
             col_c1, col_c2, col_c3 = st.columns(3)
             col_c1.metric("Total Descontado (Folha)", formatar_br(inss_desconto + irrf_final + total_descontos_legais))
             col_c2.metric("Alíquota Efetiva de INSS", f"{(inss_desconto / salario_sujeito_encargos * 100) if salario_sujeito_encargos > 0 else 0:.2f}%")
