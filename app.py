@@ -14,6 +14,7 @@ def carregar_dados():
     if not URL_PLANILHA:
         return []
     try:
+        # Transforma o link normal em um link de exportação direta em CSV para o Pandas ler
         url_csv = URL_PLANILHA.replace("/edit", "/export?format=csv")
         df = pd.read_csv(url_csv)
         
@@ -37,6 +38,22 @@ def carregar_dados():
         return []
 
 def salvar_dados(dados):
+    colunas_oficiais = ["Nº Lançamento", "Data", "Débito", "Crédito", "Valor", "Histórico"]
+    if len(dados) == 0:
+        df = pd.DataFrame(columns=colunas_oficiais)
+    else:
+        dados_planilha = []
+        for d in dados:
+            dados_planilha.append({
+                "Nº Lançamento": d.get("Nº Lançamento"),
+                "Data": d.get("Data"),
+                "Débito": d.get("Debito"),      
+                "Crédito": d.get("Credito"),    
+                "Valor": d.get("Valor"),
+                "Histórico": d.get("Historico")  
+            })
+        df = pd.DataFrame(dados_planilha)
+        df = df[colunas_oficiais]
     pass
 
 # Inicializa o estado do livro diário
@@ -51,14 +68,14 @@ def formatar_br(valor):
     except:
         return "R$ 0,00"
 
-# --- FUNÇÃO PARA CONVERTER IMAGEM LOCAL PARA BASE64 ---
+# --- FUNÇÃO PARA CONVERTER IMAGEM LOCAL PARA BASE64 (USADO NA IMPRESSÃO) ---
 def obter_logo_base64(caminho_img):
     if os.path.exists(caminho_img):
         with open(caminho_img, "rb") as image_file:
             return base64.b64encode(image_file.read()).decode('utf-8')
     return None
 
-# --- CONFIGURAÇÃO DO MENU DE NAVEGAÇÃO ---
+# --- CONTROLADOR DE NAVEGAÇÃO INTERNA ---
 opcoes_menu = [
     "🏠 Menu Principal", 
     "💻 Módulo Contábil", 
@@ -66,9 +83,8 @@ opcoes_menu = [
     "📋 Módulo de Folha & Fator R"
 ]
 
-# Inicializa o estado de navegação correto
-if 'nav_radio' not in st.session_state:
-    st.session_state.nav_radio = "🏠 Menu Principal"
+if 'pagina_selecionada' not in st.session_state:
+    st.session_state.pagina_selecionada = "🏠 Menu Principal"
 
 # --- BARRA LATERAL ---
 nome_logo = "Logo - Empresa Max contabil_2.png"
@@ -82,8 +98,16 @@ else:
 
 st.sidebar.divider()
 
-# Menu lateral utilizando diretamente o estado da sessão (evita conflitos)
-st.sidebar.radio("Navegação do Sistema", opcoes_menu, key="nav_radio")
+try:
+    idx_atual = opcoes_menu.index(st.session_state.pagina_selecionada)
+except ValueError:
+    idx_atual = 0
+
+opcao_menu = st.sidebar.radio("Navegação do Sistema", opcoes_menu, index=idx_atual, key="nav_radio")
+
+if opcao_menu != st.session_state.pagina_selecionada:
+    st.session_state.pagina_selecionada = opcao_menu
+    st.rerun()
 
 # --- PLANO DE CONTAS ---
 plano_de_contas = {
@@ -129,7 +153,7 @@ def calcular_saldos():
 saldos = calcular_saldos()
 lucro = (saldos.get("4.01", 0.0)) - (saldos.get("5.01", 0.0) + saldos.get("6.01", 0.0))
 
-# Estilização dos cartões do Menu
+# Injeta CSS Global para unificar os botões aos cards HTML do menu principal
 st.markdown("""
 <style>
     .custom-card-btn button {
@@ -152,7 +176,7 @@ st.markdown("""
 # ==============================================================================
 # TELA 1: MENU PRINCIPAL
 # ==============================================================================
-if st.session_state.nav_radio == "🏠 Menu Principal":
+if st.session_state.pagina_selecionada == "🏠 Menu Principal":
     st.title("🏛️ Hub de Soluções Contábeis Maxsuel")
     st.markdown("Seja bem-vindo ao seu painel estratégico. Selecione abaixo a ferramenta que deseja operar:")
     st.write("")
@@ -168,7 +192,7 @@ if st.session_state.nav_radio == "🏠 Menu Principal":
         """, unsafe_allow_html=True)
         st.markdown('<div class="custom-card-btn">', unsafe_allow_html=True)
         if st.button("Acessar Contabilidade ➡️", use_container_width=True, key="btn_contabil"):
-            st.session_state.nav_radio = "💻 Módulo Contábil"
+            st.session_state.pagina_selecionada = "💻 Módulo Contábil"
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
             
@@ -181,7 +205,7 @@ if st.session_state.nav_radio == "🏠 Menu Principal":
         """, unsafe_allow_html=True)
         st.markdown('<div class="custom-card-btn">', unsafe_allow_html=True)
         if st.button("Acessar Simulador Tributário ➡️", use_container_width=True, key="btn_simulador"):
-            st.session_state.nav_radio = "🧮 Simulador Simples Nacional"
+            st.session_state.pagina_selecionada = "🧮 Simulador Simples Nacional"
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -194,14 +218,14 @@ if st.session_state.nav_radio == "🏠 Menu Principal":
         """, unsafe_allow_html=True)
         st.markdown('<div class="custom-card-btn">', unsafe_allow_html=True)
         if st.button("Acessar Módulo de Folha ➡️", use_container_width=True, key="btn_folha_v"):
-            st.session_state.nav_radio = "📋 Módulo de Folha & Fator R"
+            st.session_state.pagina_selecionada = "📋 Módulo de Folha & Fator R"
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
 # ==============================================================================
 # TELA 2: MÓDULO CONTÁBIL
 # ==============================================================================
-elif st.session_state.nav_radio == "💻 Módulo Contábil":
+elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
     sub_menu = st.radio("Seções Contábeis:", ["📝 Lançamentos", "📊 DRE", "⚖️ Balanço Patrimonial"], horizontal=True)
 
     if sub_menu == "📝 Lançamentos":
@@ -219,6 +243,7 @@ elif st.session_state.nav_radio == "💻 Módulo Contábil":
                     if st.button("Confirmar Importação de Dados"):
                         dados_novos = df_importado[colunas_obrigatorias].to_dict(orient="records")
                         st.session_state.livro_diario.extend(dados_novos)
+                        salvar_dados(st.session_state.livro_diario)
                         st.success(f"{len(dados_novos)} lançamentos importados com sucesso!")
                         st.rerun()
                 else:
@@ -247,6 +272,7 @@ elif st.session_state.nav_radio == "💻 Módulo Contábil":
                     "Historico": historico  
                 }
                 st.session_state.livro_diario.append(novo)
+                salvar_dados(st.session_state.livro_diario)
                 st.success("Lançamento gravado com sucesso na nuvem!")
                 st.rerun()
 
@@ -298,7 +324,7 @@ elif st.session_state.nav_radio == "💻 Módulo Contábil":
 # ==============================================================================
 # TELA 3: SIMULADOR DO SIMPLES NACIONAL
 # ==============================================================================
-elif st.session_state.nav_radio == "🧮 Simulador Simples Nacional":
+elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
     st.title("🧮 Super Simulador Comparativo do Simples Nacional")
     
     col_in1, col_in2 = st.columns(2)
@@ -363,9 +389,13 @@ elif st.session_state.nav_radio == "🧮 Simulador Simples Nacional":
         with col_graf2:
             st.bar_chart(df_rateio.set_index("Imposto"))
 
+    # ==============================================================================
+    # EXPORTAÇÃO E IMPRESSÃO COM LOGO (HTML IMPRIMÍVEL AUTOMÁTICO)
+    # ==============================================================================
     st.divider()
     st.subheader("🖨️ Imprimir Simulação")
     
+    # Construção do documento HTML customizado para impressão
     html_linhas_tabela = ""
     for r in resultados:
         imp_v = formatar_br(r["Imposto Mensal"]) if isinstance(r["Imposto Mensal"], (int, float)) else r["Imposto Mensal"]
@@ -458,6 +488,7 @@ elif st.session_state.nav_radio == "🧮 Simulador Simples Nacional":
         </div>
         
         <script>
+            // Aciona automaticamente a janela de impressão ao abrir o arquivo externo
             window.onload = function() {{ window.print(); }}
         </script>
     </body>
@@ -476,7 +507,7 @@ elif st.session_state.nav_radio == "🧮 Simulador Simples Nacional":
 # ==============================================================================
 # TELA 4: MÓDULO DE FOLHA & FATOR R
 # ==============================================================================
-elif st.session_state.nav_radio == "📋 Módulo de Folha & Fator R":
+elif st.session_state.pagina_selecionada == "📋 Módulo de Folha & Fator R":
     st.title("📋 Painel Estratégico de DP: Folha & Fator R")
     
     sub_aba_dp = st.radio("Escolha a Operação:", ["🔍 Análise do Fator R", "🧮 Simulador Prático de Salário Líquido (2026)"], horizontal=True)
@@ -506,6 +537,7 @@ elif st.session_state.nav_radio == "📋 Módulo de Folha & Fator R":
             
     elif sub_aba_dp == "🧮 Simulador Prático de Salário Líquido (2026)":
         st.subheader("Simulador de Folha de Pagamento & Férias - Competência 2026")
+        st.markdown("Cálculo integrado com os novos tetos de INSS, deduções legais e regras de férias.")
         
         st.sidebar.header("⚙️ Parâmetros do Trabalhador")
         salario_bruto = st.sidebar.number_input("Salário Bruto / Pró-Labore (R$):", min_value=0.00, value=6500.00, step=100.00, format="%.2f")
