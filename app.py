@@ -407,7 +407,7 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
         st.write(f"Empresa: **{empresa_selecionada}** | CNPJ: {cnpj_empresa_atual}")
         
         # No lugar do botão antigo, cole este componente:
-    components.html( """
+        components.html( """
         <button onclick="window.parent.print()" style="
         padding: 10px 20px; 
         background-color: #0f2a4a; 
@@ -417,7 +417,8 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
         cursor: pointer;
         font-weight: bold;
         font-family: sans-serif;
-        ">🖨️ Imprimir Relatório Profissional</button>""",    height=50,)
+        ">🖨️ Imprimir Relatório Profissional</button>
+        """,    height=50,)
         
         # Início do Bloco Estrutural Printable (Alvo do Print do Navegador)
         st.markdown(f"""
