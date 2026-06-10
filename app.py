@@ -57,9 +57,9 @@ plano_de_contas = {
     "2.01": "Fornecedores", 
     "2.02": "Provisões", 
     "2.03": "Empréstimos", 
-    "2.05": "Capital Social", 
-    "2.06": "Lucros Acumulados",
-    "2.04": "Dividendos a Pagar (Passivo)", # <-- Nova Conta de Histórico/Obrigação
+    "2.04": "Capital Social", 
+    "2.05": "Lucros Acumulados",
+    "2.06": "Dividendos a Pagar (Passivo)", # <-- Nova Conta de Histórico/Obrigação
     "4.01": "Receita de Vendas", 
     "5.01": "Despesas Operacionais", 
     "5.02": "Antecipação/Distribuição de Dividendos", # <-- Nova Conta de Resultado/Dedução
@@ -407,8 +407,8 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
         st.write(f"Empresa: **{empresa_selecionada}** | CNPJ: {cnpj_empresa_atual}")
         
         # Botão Inteligente de Impressão via Javascript Nativo do Navegador
-        st.markdown('<button onclick="window.print()" style="padding:10px 20px; background-color:#0f2a4a; color:white; border:none; border-radius:5px; cursor:pointer;" class="no-print">🖨️ Imprimir Balancete Profissional</button>', unsafe_allow_html=True)        
-       
+        st.markdown('<button onclick="window.print()" style="padding:10px 20px; background-color:#0f2a4a; color:white; border:none; border-radius:5px; cursor:pointer;" class="no-print">🖨️ Imprimir Balancete Profissional</button>', unsafe_allow_html=True)
+        
         # Início do Bloco Estrutural Printable (Alvo do Print do Navegador)
         st.markdown(f"""
         <div class="printable-report">
