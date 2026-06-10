@@ -406,8 +406,18 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
         st.title("⚖️ Balancete de Verificação")
         st.write(f"Empresa: **{empresa_selecionada}** | CNPJ: {cnpj_empresa_atual}")
         
-        # Botão Inteligente de Impressão via Javascript Nativo do Navegador
-        st.markdown('<button onclick="window.print()" style="padding:10px 20px; background-color:#0f2a4a; color:white; border:none; border-radius:5px; cursor:pointer;" class="no-print">🖨️ Imprimir Balancete Profissional</button>', unsafe_allow_html=True)
+        # No lugar do botão antigo, cole este componente:
+    components.html( """
+        <button onclick="window.parent.print()" style="
+        padding: 10px 20px; 
+        background-color: #0f2a4a; 
+        color: white; 
+        border: none; 
+        border-radius: 5px; 
+        cursor: pointer;
+        font-weight: bold;
+        font-family: sans-serif;
+        ">🖨️ Imprimir Relatório Profissional</button>""",    height=50,)
         
         # Início do Bloco Estrutural Printable (Alvo do Print do Navegador)
         st.markdown(f"""
