@@ -11,7 +11,9 @@ st.set_page_config(page_title="Maxsuel Contabilidade - Gestão e Estratégia", l
 # ==============================================================================
 # 1. ATUALIZAÇÃO: INICIALIZAÇÃO DO BANCO DE DADOS (SQLITE)
 # ==============================================================================
-DB_NOME = "maxsuel_contabilidade.db"
+# Garante que o banco de dados seja salvo em um caminho absoluto e fixo
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_NOME = os.path.join(BASE_DIR, "maxsuel_contabilidade.db")
 
 def conectar_db():
     return sqlite3.connect(DB_NOME)
