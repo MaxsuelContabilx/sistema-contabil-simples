@@ -59,9 +59,9 @@ plano_de_contas = {
     "2.01": "Fornecedores", 
     "2.02": "Provisões", 
     "2.03": "Empréstimos", 
-    "2.04": "Capital Social", 
-    "2.05": "Lucros Acumulados",
-    "2.06": "Dividendos a Pagar (Passivo)", # <-- Nova Conta de Histórico/Obrigação
+    "2.04": "Dividendos a Pagar (Passivo)", 
+    "2.05": "Capital Social",
+    "2.06": "Lucros Acumulados", # <-- Nova Conta de Histórico/Obrigação
     "4.01": "Receita de Vendas", 
     "5.01": "Despesas Operacionais", 
     "5.02": "Antecipação/Distribuição de Dividendos", # <-- Nova Conta de Resultado/Dedução
