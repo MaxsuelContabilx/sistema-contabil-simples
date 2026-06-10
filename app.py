@@ -401,25 +401,11 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
         else:
             st.info("Nenhum lançamento armazenado na nuvem/banco para esta empresa.")
 
-    # --- ABA NOVA: BALANCETE DE VERIFICAÇÃO ---
+   # --- ABA NOVA: BALANCETE DE VERIFICAÇÃO ---
     elif sub_menu == "⚖️ Balancete":
         st.title("⚖️ Balancete de Verificação")
         st.write(f"Empresa: **{empresa_selecionada}** | CNPJ: {cnpj_empresa_atual}")
         
-        # Botão Inteligente de Impressão via Javascript Nativo do Navegador
-        st.markdown('<button onclick="window.print()" style="padding:10px 20px; background-color:#0f2a4a; color:white; border:none; border-radius:5px; cursor:pointer;" class="no-print">🖨️ Imprimir Balancete Profissional</button>', unsafe_allow_html=True)
-        
-        # Início do Bloco Estrutural Printable (Alvo do Print do Navegador)
-        st.markdown(f"""
-        <div class="printable-report">
-            <h2 style='text-align: center; margin-bottom: 5px;'>MAXSUEL CONTABILIDADE</h2>
-            <h4 style='text-align: center; margin-top: 0; color:#555;'>BALANCETE DE VERIFICAÇÃO INTEGRAL</h4>
-            <hr>
-            <p><b>Empresa Emissora:</b> {empresa_selecionada} &nbsp;&nbsp;&nbsp;&nbsp; <b>CNPJ:</b> {cnpj_empresa_atual}</p>
-            <p><b>Data de Emissão:</b> {datetime.now().strftime('%d/%m/%Y %H:%M')}</p>
-        </div>
-        """, unsafe_allow_html=True)
-
         balancete_dados = []
         tot_deb = 0
         tot_cred = 0
@@ -432,7 +418,6 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
             debito_acumulado = df_l[df_l['debito'] == cod]['valor'].sum()
             credito_acumulado = df_l[df_l['credito'] == cod]['valor'].sum()
             
-            # Natureza das Contas Contábeis (Ativo/Despesa = Devedora | Passivo/PL/Receita = Credora)
             if cod.startswith(('1', '5', '6')):
                 saldo_final = debito_acumulado - credito_acumulado
             else:
@@ -444,75 +429,248 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
                 balancete_dados.append({
                     "Código": cod,
                     "Conta Contábil": nome,
-                    "Débito (R$)": formatar_br(debito_acumulado),
-                    "Crédito (R$)": formatar_br(credito_acumulado),
-                    "Saldo Final (R$)": formatar_br(saldo_final)
+                    "Débito": debito_acumulado,
+                    "Crédito": credito_acumulado,
+                    "Saldo Final": saldo_final
                 })
         
         if balancete_dados:
-            st.table(pd.DataFrame(balancete_dados))
-            col_b1, col_b2 = st.columns(2)
-            col_b1.metric("Total Débitos Movimentados", formatar_br(tot_deb))
-            col_b2.metric("Total Créditos Movimentados", formatar_br(tot_cred))
+            df_balancete_print = pd.DataFrame(balancete_dados)
+            
+            # Exibição na tela (Formatada para o usuário)
+            df_tela = df_balancete_print.copy()
+            df_tela["Débito"] = df_tela["Débito"].apply(formatar_br)
+            df_tela["Crédito"] = df_tela["Crédito"].apply(formatar_br)
+            df_tela["Saldo Final"] = df_tela["Saldo Final"].apply(formatar_br)
+            st.table(df_tela)
+            
+            # --- GERADOR DE PDF PROFISSIONAL COM REPORTLAB ---
+            from io import BytesIO
+            from reportlab.lib.pagesizes import letter
+            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib import colors
+
+            buffer = BytesIO()
+            doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
+            story = []
+            styles = getSampleStyleSheet()
+            
+            # Estilos personalizados
+            titulo_style = ParagraphStyle('TituloStyle', parent=styles['Heading1'], fontSize=18, textColor=colors.HexColor('#0f2a4a'), alignment=1, spaceAfter=5)
+            sub_style = ParagraphStyle('SubStyle', parent=styles['Normal'], fontSize=11, textColor=colors.HexColor('#555555'), alignment=1, spaceAfter=15)
+            texto_style = ParagraphStyle('TextoStyle', parent=styles['Normal'], fontSize=10, textColor=colors.black)
+            header_tabela = ParagraphStyle('HeaderTabela', parent=styles['Normal'], fontSize=10, textColor=colors.white, fontName='Helvetica-Bold')
+
+            # Cabeçalho do PDF
+            story.append(Paragraph("<b>MAXSUEL CONTABILIDADE</b>", titulo_style))
+            story.append(Paragraph(f"BALANCETE DE VERIFICAÇÃO INTEGRAL — {datetime.now().strftime('%d/%m/%Y %H:%M')}", sub_style))
+            story.append(Paragraph(f"<b>Empresa:</b> {empresa_selecionada} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <b>CNPJ:</b> {cnpj_empresa_atual}", texto_style))
+            story.append(Spacer(1, 15))
+            
+            # Dados da tabela para o PDF
+            data_pdf = [[Paragraph("<b>Código</b>", header_tabela), Paragraph("<b>Conta Contábil</b>", header_tabela), Paragraph("<b>Débito</b>", header_tabela), Paragraph("<b>Crédito</b>", header_tabela), Paragraph("<b>Saldo Final</b>", header_tabela)]]
+            
+            for row in balancete_dados:
+                data_pdf.append([
+                    Paragraph(row["Código"], texto_style),
+                    Paragraph(row["Conta Contábil"], texto_style),
+                    Paragraph(formatar_br(row["Débito"]), texto_style),
+                    Paragraph(formatar_br(row["Crédito"]), texto_style),
+                    Paragraph(formatar_br(row["Saldo Final"]), texto_style)
+                ])
+            
+            # Adiciona linha de totais no PDF
+            data_pdf.append([Paragraph("", texto_style), Paragraph("<b>TOTALIZADORES:</b>", texto_style), Paragraph(f"<b>{formatar_br(tot_deb)}</b>", texto_style), Paragraph(f"<b>{formatar_br(tot_cred)}</b>", texto_style), Paragraph("", texto_style)])
+            
+            t = Table(data_pdf, colWidths=[50, 200, 100, 100, 100])
+            t.setStyle(TableStyle([
+                ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#0f2a4a')),
+                ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+                ('BOTTOMPADDING', (0,0), (-1,0), 8),
+                ('BACKGROUND', (0,1), (-1,-2), colors.HexColor('#f8fafc')),
+                ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
+                ('ROWBACKGROUNDS', (0,1), (-1,-2), [colors.white, colors.HexColor('#f1f5f9')]), # Linhas zebradas
+                ('BACKGROUND', (0,-1), (-1,-1), colors.HexColor('#e2e8f0')), # Cor da linha de totais
+            ]))
+            story.append(t)
+            doc.build(story)
+            
+            pdf_bytes = buffer.getvalue()
+            buffer.close()
+            
+            # Botão de Download Oficial
+            st.download_button(
+                label="📥 Baixar PDF para Impressão",
+                data=pdf_bytes,
+                file_name=f"Balancete_{empresa_selecionada.replace(' ', '_')}.pdf",
+                mime="application/pdf",
+                use_container_width=True
+            )
         else:
             st.info("Sem movimentações financeiras para gerar o Balancete.")
 
     # --- ABA: DRE ---
     elif sub_menu == "📊 DRE":
         st.title("📊 Demonstrativo de Resultado do Exercício (DRE)")
+        st.write(f"Empresa: **{empresa_selecionada}**")
         
-        st.markdown('<button onclick="window.print()" style="padding:10px 20px; background-color:#0f2a4a; color:white; border:none; border-radius:5px; cursor:pointer;" class="no-print">🖨️ Imprimir DRE Profissional</button>', unsafe_allow_html=True)
-        
-        st.markdown(f"""
-        <div class="printable-report">
-            <h2 style='text-align: center; margin-bottom: 5px;'>MAXSUEL CONTABILIDADE</h2>
-            <h4 style='text-align: center; margin-top: 0; color:#555;'>DEMONSTRATIVO DE RESULTADO DO EXERCÍCIO</h4>
-            <hr>
-            <p><b>Empresa Emissora:</b> {empresa_selecionada} &nbsp;&nbsp;&nbsp;&nbsp; <b>CNPJ:</b> {cnpj_empresa_atual}</p>
-        </div>
-        """, unsafe_allow_html=True)
-
         st.metric("LUCRO LÍQUIDO DO PERÍODO", formatar_br(lucro))
-        df_dre = pd.DataFrame([
-            {"Estrutura Contábil": "Receita Bruta de Vendas (4.x)", "Valor": formatar_br(saldos.get("4.01", 0.0))},
-            {"Estrutura Contábil": "(-) Despesas Operacionais (5.01)", "Valor": formatar_br(-saldos.get("5.01", 0.0))},
-            {"Estrutura Contábil": "(-) Distribuição de Dividendos (5.02)", "Valor": formatar_br(-saldos.get("5.02", 0.0))},
-            {"Estrutura Contábil": "(-) Impostos Incidentes (6.x)", "Valor": formatar_br(-saldos.get("6.01", 0.0))},
-            {"Estrutura Contábil": "(=) RESULTADO LÍQUIDO (ARE)", "Valor": formatar_br(lucro)}
-        ])
+        
+        lista_dre = [
+            {"Estrutura Contábil": "Receita Bruta de Vendas (4.01)", "Valor": saldos.get("4.01", 0.0)},
+            {"Estrutura Contábil": "(-) Despesas Operacionais (5.01)", "Valor": -saldos.get("5.01", 0.0)},
+            {"Estrutura Contábil": "(-) Distribuição de Dividendos (5.02)", "Valor": -saldos.get("5.02", 0.0)},
+            {"Estrutura Contábil": "(-) Impostos Incidentes (6.x)", "Valor": -saldos.get("6.01", 0.0)},
+            {"Estrutura Contábil": "(=) RESULTADO LÍQUIDO (ARE)", "Valor": lucro}
+        ]
+        
+        df_dre = pd.DataFrame([{"Estrutura Contábil": item["Estrutura Contábil"], "Valor": formatar_br(item["Valor"])} for item in lista_dre])
         st.table(df_dre)
+        
+        # Gerador PDF da DRE
+        from io import BytesIO
+        from reportlab.lib.pagesizes import letter
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib import colors
+
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
+        story = []
+        styles = getSampleStyleSheet()
+        
+        titulo_style = ParagraphStyle('TituloDRE', parent=styles['Heading1'], fontSize=18, textColor=colors.HexColor('#0f2a4a'), alignment=1, spaceAfter=5)
+        sub_style = ParagraphStyle('SubDRE', parent=styles['Normal'], fontSize=11, textColor=colors.HexColor('#555555'), alignment=1, spaceAfter=20)
+        texto_style = ParagraphStyle('TextoDRE', parent=styles['Normal'], fontSize=11, textColor=colors.black)
+        header_style = ParagraphStyle('HeaderDRE', parent=styles['Normal'], fontSize=11, textColor=colors.white, fontName='Helvetica-Bold')
+
+        story.append(Paragraph("<b>MAXSUEL CONTABILIDADE</b>", titulo_style))
+        story.append(Paragraph(f"DEMONSTRATIVO DE RESULTADO DO EXERCÍCIO (DRE)", sub_style))
+        story.append(Paragraph(f"<b>Empresa:</b> {empresa_selecionada} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <b>CNPJ:</b> {cnpj_empresa_atual}", texto_style))
+        story.append(Spacer(1, 15))
+        
+        data_pdf = [[Paragraph("<b>Estrutura Contábil</b>", header_style), Paragraph("<b>Valor Corrente</b>", header_style)]]
+        for row in lista_dre:
+            data_pdf.append([Paragraph(row["Estrutura Contábil"], texto_style), Paragraph(formatar_br(row["Valor"]), texto_style)])
+            
+        t = Table(data_pdf, colWidths=[350, 150])
+        t.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#0f2a4a')),
+            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
+            ('ROWBACKGROUNDS', (0,1), (-1,-2), [colors.white, colors.HexColor('#f8fafc')]),
+            ('BACKGROUND', (0,-1), (-1,-1), colors.HexColor('#e2e8f0')), # Linha do Resultado Líquido em Destaque
+            ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+            ('TOPPADDING', (0,0), (-1,-1), 8),
+        ]))
+        story.append(t)
+        doc.build(story)
+        pdf_bytes = buffer.getvalue()
+        buffer.close()
+        
+        st.download_button(
+            label="📥 Baixar DRE em PDF Comercial",
+            data=pdf_bytes,
+            file_name=f"DRE_{empresa_selecionada.replace(' ', '_')}.pdf",
+            mime="application/pdf",
+            use_container_width=True
+        )
 
     # --- ABA: BALANÇO PATRIMONIAL ---
     elif sub_menu == "⚖️ Balanço Patrimonial":
         st.title("⚖️ Balanço Patrimonial Consolidado")
+        st.write(f"Empresa: **{empresa_selecionada}**")
         
-        st.markdown('<button onclick="window.print()" style="padding:10px 20px; background-color:#0f2a4a; color:white; border:none; border-radius:5px; cursor:pointer;" class="no-print">🖨️ Imprimir Balanço Profissional</button>', unsafe_allow_html=True)
-        
-        st.markdown(f"""
-        <div class="printable-report">
-            <h2 style='text-align: center; margin-bottom: 5px;'>MAXSUEL CONTABILIDADE</h2>
-            <h4 style='text-align: center; margin-top: 0; color:#555;'>BALANÇO PATRIMONIAL CONSOLIDADO</h4>
-            <hr>
-            <p><b>Empresa Emissora:</b> {empresa_selecionada} &nbsp;&nbsp;&nbsp;&nbsp; <b>CNPJ:</b> {cnpj_empresa_atual}</p>
-        </div>
-        """, unsafe_allow_html=True)
-
         saldos_bp = saldos.copy()
         saldos_bp["2.05"] = saldos_bp.get("2.05", 0.0) + lucro  
         col_a, col_p = st.columns(2)
+        
+        ativo_data = [{"Conta": n, "Valor": saldos_bp.get(c, 0.0)} for c, n in plano_de_contas.items() if c.startswith('1')]
+        total_ativo = sum(saldos_bp.get(c, 0.0) for c in plano_de_contas if c.startswith('1'))
+        
+        passivo_data = [{"Conta": n, "Valor": saldos_bp.get(c, 0.0)} for c, n in plano_de_contas.items() if c.startswith('2')]
+        total_passivo = sum(saldos_bp.get(c, 0.0) for c in plano_de_contas if c.startswith('2'))
+        
         with col_a:
             st.subheader("🔵 ATIVO")
-            ativo_data = [{"Conta": n, "Valor": formatar_br(saldos_bp.get(c, 0.0))} for c, n in plano_de_contas.items() if c.startswith('1')]
-            st.table(pd.DataFrame(ativo_data))
-            total_ativo = sum(saldos_bp.get(c, 0.0) for c in plano_de_contas if c.startswith('1'))
+            df_ativo_tela = pd.DataFrame([{"Conta": i["Conta"], "Valor": formatar_br(i["Valor"])} for i in ativo_data])
+            st.table(df_ativo_tela)
             st.info(f"**Total do Ativo:** {formatar_br(total_ativo)}")
+            
         with col_p:
             st.subheader("🟡 PASSIVO + PL")
-            passivo_data = [{"Conta": n, "Valor": formatar_br(saldos_bp.get(c, 0.0))} for c, n in plano_de_contas.items() if c.startswith('2')]
-            st.table(pd.DataFrame(passivo_data))
-            total_passivo = sum(saldos_bp.get(c, 0.0) for c in plano_de_contas if c.startswith('2'))
+            df_passivo_tela = pd.DataFrame([{"Conta": i["Conta"], "Valor": formatar_br(i["Valor"])} for i in passivo_data])
+            st.table(df_passivo_tela)
             st.info(f"**Total do Passivo + PL:** {formatar_br(total_passivo)}")
+            
+        # Gerador PDF do Balanço Patrimonial (Lado a Lado ou em blocos limpos)
+        from io import BytesIO
+        from reportlab.lib.pagesizes import letter
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib import colors
 
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
+        story = []
+        styles = getSampleStyleSheet()
+        
+        titulo_style = ParagraphStyle('TituloBP', parent=styles['Heading1'], fontSize=18, textColor=colors.HexColor('#0f2a4a'), alignment=1, spaceAfter=5)
+        sub_style = ParagraphStyle('SubBP', parent=styles['Normal'], fontSize=11, textColor=colors.HexColor('#555555'), alignment=1, spaceAfter=20)
+        texto_style = ParagraphStyle('TextoBP', parent=styles['Normal'], fontSize=10, textColor=colors.black)
+        header_style = ParagraphStyle('HeaderBP', parent=styles['Normal'], fontSize=10, textColor=colors.white, fontName='Helvetica-Bold')
+
+        story.append(Paragraph("<b>MAXSUEL CONTABILIDADE</b>", titulo_style))
+        story.append(Paragraph(f"BALANÇO PATRIMONIAL CONSOLIDADO", sub_style))
+        story.append(Paragraph(f"<b>Empresa:</b> {empresa_selecionada} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <b>CNPJ:</b> {cnpj_empresa_atual}", texto_style))
+        story.append(Spacer(1, 15))
+        
+        # Montagem das duas colunas de dados para estruturar o PDF de forma profissional
+        dados_ativos_pdf = [[Paragraph("<b>Conta (ATIVO)</b>", header_style), Paragraph("<b>Valor</b>", header_style)]]
+        for item in ativo_data:
+            dados_ativos_pdf.append([Paragraph(item["Conta"], texto_style), Paragraph(formatar_br(item["Valor"]), texto_style)])
+        dados_ativos_pdf.append([Paragraph("<b>TOTAL DO ATIVO</b>", texto_style), Paragraph(f"<b>{formatar_br(total_ativo)}</b>", texto_style)])
+        
+        dados_passivos_pdf = [[Paragraph("<b>Conta (PASSIVO + PL)</b>", header_style), Paragraph("<b>Valor</b>", header_style)]]
+        for item in passivo_data:
+            dados_passivos_pdf.append([Paragraph(item["Conta"], texto_style), Paragraph(formatar_br(item["Valor"]), texto_style)])
+        dados_passivos_pdf.append([Paragraph("<b>TOTAL PASSIVO + PL</b>", texto_style), Paragraph(f"<b>{formatar_br(total_passivo)}</b>", texto_style)])
+        
+        # Equaliza o tamanho das tabelas para o PDF não quebrar as linhas
+        max_len = max(len(dados_ativos_pdf), len(dados_passivos_pdf))
+        while len(dados_ativos_pdf) < max_len:
+            dados_ativos_pdf.insert(-1, [Paragraph("-", texto_style), Paragraph("-", texto_style)])
+        while len(dados_passivos_pdf) < max_len:
+            dados_passivos_pdf.insert(-1, [Paragraph("-", texto_style), Paragraph("-", texto_style)])
+            
+        # Une as tabelas lado a lado no arquivo
+        tabela_mestra_dados = []
+        for i in range(max_len):
+            tabela_mestra_dados.append(dados_ativos_pdf[i] + dados_passivos_pdf[i])
+            
+        t_bp = Table(tabela_mestra_dados, colWidths=[170, 95, 170, 95])
+        t_bp.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (1,0), colors.HexColor('#0f2a4a')), # Header Ativo
+            ('BACKGROUND', (2,0), (3,0), colors.HexColor('#d4af37')), # Header Passivo (Dourado/Amarelo do seu padrão)
+            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
+            ('BACKGROUND', (0,-1), (1,-1), colors.HexColor('#e2e8f0')), # Totais Ativo
+            ('BACKGROUND', (2,-1), (3,-1), colors.HexColor('#e2e8f0')), # Totais Passivo
+            ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+            ('TOPPADDING', (0,0), (-1,-1), 6),
+        ]))
+        
+        story.append(t_bp)
+        doc.build(story)
+        pdf_bytes = buffer.getvalue()
+        buffer.close()
+        
+        st.download_button(
+            label="📥 Baixar Balanço Patrimonial em PDF",
+            data=pdf_bytes,
+            file_name=f"Balanco_{empresa_selecionada.replace(' ', '_')}.pdf",
+            mime="application/pdf",
+            use_container_width=True
+        )
 # As outras abas estruturais do seu código ("🧮 Simulador Simples Nacional" e "📋 Módulo de Folha & Fator R") continuam logo abaixo intocadas, mantendo o funcionamento idêntico ao original.
 
 # ==============================================================================
