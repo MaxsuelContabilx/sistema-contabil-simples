@@ -463,7 +463,7 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
             header_tabela = ParagraphStyle('HeaderTabela', parent=styles['Normal'], fontSize=10, textColor=colors.white, fontName='Helvetica-Bold')
 
             # Cabeçalho do PDF
-            story.append(Paragraph("<b>MAXSUEL CONTABILIDADE</b>", titulo_style))
+            story.append(Paragraph("<b>MAXSUEL GESTÃO CONTÁBIL & ESTRATÉGICA</b>", titulo_style))
             story.append(Paragraph(f"BALANCETE DE VERIFICAÇÃO INTEGRAL — {datetime.now().strftime('%d/%m/%Y %H:%M')}", sub_style))
             story.append(Paragraph(f"<b>Empresa:</b> {empresa_selecionada} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <b>CNPJ:</b> {cnpj_empresa_atual}", texto_style))
             story.append(Spacer(1, 15))
@@ -545,7 +545,7 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
         texto_style = ParagraphStyle('TextoDRE', parent=styles['Normal'], fontSize=11, textColor=colors.black)
         header_style = ParagraphStyle('HeaderDRE', parent=styles['Normal'], fontSize=11, textColor=colors.white, fontName='Helvetica-Bold')
 
-        story.append(Paragraph("<b>MAXSUEL CONTABILIDADE</b>", titulo_style))
+        story.append(Paragraph("<b>MAXSUEL GESTÃO CONTÁBIL & ESTRATÉGICA</b>", titulo_style))
         story.append(Paragraph(f"DEMONSTRATIVO DE RESULTADO DO EXERCÍCIO (DRE)", sub_style))
         story.append(Paragraph(f"<b>Empresa:</b> {empresa_selecionada} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <b>CNPJ:</b> {cnpj_empresa_atual}", texto_style))
         story.append(Spacer(1, 15))
@@ -620,7 +620,7 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
         texto_style = ParagraphStyle('TextoBP', parent=styles['Normal'], fontSize=10, textColor=colors.black)
         header_style = ParagraphStyle('HeaderBP', parent=styles['Normal'], fontSize=10, textColor=colors.white, fontName='Helvetica-Bold')
 
-        story.append(Paragraph("<b>MAXSUEL CONTABILIDADE</b>", titulo_style))
+        story.append(Paragraph("<b>MAXSUEL GESTÃO CONTÁBIL & ESTRATÉGICA</b>", titulo_style))
         story.append(Paragraph(f"BALANÇO PATRIMONIAL CONSOLIDADO", sub_style))
         story.append(Paragraph(f"<b>Empresa:</b> {empresa_selecionada} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <b>CNPJ:</b> {cnpj_empresa_atual}", texto_style))
         story.append(Spacer(1, 15))
