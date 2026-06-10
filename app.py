@@ -2,63 +2,70 @@ import streamlit as st
 import pandas as pd
 import os
 import base64
+import sqlite3
 from datetime import datetime
 
 # Configuração da Página
 st.set_page_config(page_title="Maxsuel Contabilidade - Gestão e Estratégia", layout="wide")
 
-# URL da sua planilha vinda dos Secrets
-URL_PLANILHA = st.secrets["SPREADSHEET_URL"] if "SPREADSHEET_URL" in st.secrets else ""
+# ==============================================================================
+# 1. ATUALIZAÇÃO: INICIALIZAÇÃO DO BANCO DE DADOS (SQLITE)
+# ==============================================================================
+DB_NOME = "maxsuel_contabilidade.db"
 
-def carregar_dados():
-    if not URL_PLANILHA:
-        return []
-    try:
-        # Transforma o link normal em um link de exportação direta em CSV para o Pandas ler
-        url_csv = URL_PLANILHA.replace("/edit", "/export?format=csv")
-        df = pd.read_csv(url_csv)
-        
-        if df.empty or len(df) == 0:
-            return []
-            
-        df.columns = [str(col).strip() for col in df.columns]
-        
-        dados_formatados = []
-        for row in df.to_dict(orient="records"):
-            dados_formatados.append({
-                "Nº Lançamento": row.get("Nº Lançamento", len(dados_formatados) + 1),
-                "Data": row.get("Data", ""),
-                "Debito": row.get("Débito", ""),     
-                "Credito": row.get("Crédito", ""),   
-                "Valor": float(row.get("Valor", 0.0)) if row.get("Valor") else 0.0,
-                "Historico": row.get("Histórico", "") 
-            })
-        return dados_formatados
-    except Exception as e:
-        return []
+def conectar_db():
+    return sqlite3.connect(DB_NOME)
 
-def salvar_dados(dados):
-    colunas_oficiais = ["Nº Lançamento", "Data", "Débito", "Crédito", "Valor", "Histórico"]
-    if len(dados) == 0:
-        df = pd.DataFrame(columns=colunas_oficiais)
-    else:
-        dados_planilha = []
-        for d in dados:
-            dados_planilha.append({
-                "Nº Lançamento": d.get("Nº Lançamento"),
-                "Data": d.get("Data"),
-                "Débito": d.get("Debito"),      
-                "Crédito": d.get("Credito"),    
-                "Valor": d.get("Valor"),
-                "Histórico": d.get("Historico")  
-            })
-        df = pd.DataFrame(dados_planilha)
-        df = df[colunas_oficiais]
-    pass
+def inicializar_banco():
+    conn = conectar_db()
+    cursor = conn.cursor()
+    # Tabela de Empresas
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS empresas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT NOT NULL,
+            cnpj TEXT UNIQUE NOT NULL
+        )
+    """)
+    # Tabela de Lançamentos Contábeis (amarrada à Empresa)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS lancamentos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            empresa_id INTEGER NOT NULL,
+            data TEXT NOT NULL,
+            debito TEXT NOT NULL,
+            credito TEXT NOT NULL,
+            valor REAL NOT NULL,
+            historico TEXT,
+            FOREIGN KEY (empresa_id) REFERENCES empresas(id)
+        )
+    """)
+    conn.commit()
+    conn.close()
 
-# Inicializa o estado do livro diário
-if 'livro_diario' not in st.session_state:
-    st.session_state.livro_diario = carregar_dados()
+# Executa a criação das tabelas se não existirem
+inicializar_banco()
+
+# ==============================================================================
+# 2. ATUALIZAÇÃO: PLANO DE CONTAS EXPANDIDO (INCLUSÃO DE DIVIDENDOS)
+# ==============================================================================
+plano_de_contas = {
+    "1.01": "Caixa/Banco", 
+    "1.02": "Estoque", 
+    "1.03": "Clientes a Receber", 
+    "1.04": "Imobilizado",
+    "2.01": "Fornecedores", 
+    "2.02": "Provisões", 
+    "2.03": "Empréstimos", 
+    "2.04": "Capital Social", 
+    "2.05": "Lucros Acumulados",
+    "2.06": "Dividendos a Pagar (Passivo)", # <-- Nova Conta de Histórico/Obrigação
+    "4.01": "Receita de Vendas", 
+    "5.01": "Despesas Operacionais", 
+    "5.02": "Antecipação/Distribuição de Dividendos", # <-- Nova Conta de Resultado/Dedução
+    "6.01": "Impostos", 
+    "7.01": "ARE"
+}
 
 # --- FUNÇÃO DE FORMATAÇÃO DE MOEDA PT-BR ---
 def formatar_br(valor):
@@ -68,23 +75,43 @@ def formatar_br(valor):
     except:
         return "R$ 0,00"
 
-# --- FUNÇÃO PARA CONVERTER IMAGEM LOCAL PARA BASE64 (USADO NA IMPRESSÃO) ---
+# --- FUNÇÃO PARA CONVERTER IMAGEM LOCAL PARA BASE64 ---
 def obter_logo_base64(caminho_img):
     if os.path.exists(caminho_img):
         with open(caminho_img, "rb") as image_file:
             return base64.b64encode(image_file.read()).decode('utf-8')
     return None
 
-# --- CONTROLADOR DE NAVEGAÇÃO INTERNA ---
-opcoes_menu = [
-    "🏠 Menu Principal", 
-    "💻 Módulo Contábil", 
-    "🧮 Simulador Simples Nacional",
-    "📋 Módulo de Folha & Fator R"
-]
+# ==============================================================================
+# 3. ATUALIZAÇÃO: FUNÇÕES DE CARGA E SALVAMENTO ADAPTADAS PARA O BANCO DE DADOS
+# ==============================================================================
+def carregar_lancamentos_db(empresa_id):
+    conn = conectar_db()
+    query = "SELECT id AS [Nº Lançamento], data AS Data, debito AS Debito, credito AS Credito, valor AS Valor, historico AS Historico FROM lancamentos WHERE empresa_id = ?"
+    df = pd.read_sql_query(query, conn, params=(int(empresa_id),))
+    conn.close()
+    return df.to_dict(orient="records")
 
-if 'pagina_selecionada' not in st.session_state:
-    st.session_state.pagina_selecionada = "🏠 Menu Principal"
+def salvar_lancamento_db(empresa_id, data, debito, credito, valor, historico):
+    conn = conectar_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO lancamentos (empresa_id, data, debito, credito, valor, historico)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (int(empresa_id), str(data), debito, credito, float(valor), historico))
+    conn.commit()
+    conn.close()
+
+def carregar_empresas():
+    conn = conectar_db()
+    df = pd.read_sql_query("SELECT * FROM empresas ORDER BY nome ASC", conn)
+    conn.close()
+    return df
+
+# ==============================================================================
+# 4. ATUALIZAÇÃO: BUSCA DE EMPRESAS PARA A BARRA LATERAL
+# ==============================================================================
+df_empresas = carregar_empresas()
 
 # --- BARRA LATERAL ---
 nome_logo = "Logo - Empresa Max contabil_2.png"
@@ -98,6 +125,31 @@ else:
 
 st.sidebar.divider()
 
+# SELETOR DE EMPRESA ATIVA
+st.sidebar.subheader("🏢 Empresa em Operação")
+if not df_empresas.empty:
+    lista_empresas = df_empresas["nome"].tolist()
+    empresa_selecionada = st.sidebar.selectbox("Escolha a Empresa:", lista_empresas)
+    empresa_id_atual = df_empresas[df_empresas["nome"] == empresa_selecionada]["id"].values[0]
+    cnpj_empresa_atual = df_empresas[df_empresas["nome"] == empresa_selecionada]["cnpj"].values[0]
+else:
+    st.sidebar.warning("Nenhuma empresa cadastrada no sistema.")
+    empresa_id_atual = None
+    cnpj_empresa_atual = ""
+
+st.sidebar.divider()
+
+# CONTROLADOR DE NAVEGAÇÃO INTERNA
+opcoes_menu = [
+    "🏠 Menu Principal", 
+    "💻 Módulo Contábil", 
+    "🧮 Simulador Simples Nacional",
+    "📋 Módulo de Folha & Fator R"
+]
+
+if 'pagina_selecionada' not in st.session_state:
+    st.session_state.pagina_selecionada = "🏠 Menu Principal"
+
 try:
     idx_atual = opcoes_menu.index(st.session_state.pagina_selecionada)
 except ValueError:
@@ -109,12 +161,11 @@ if opcao_menu != st.session_state.pagina_selecionada:
     st.session_state.pagina_selecionada = opcao_menu
     st.rerun()
 
-# --- PLANO DE CONTAS ---
-plano_de_contas = {
-    "1.01": "Caixa/Banco", "1.02": "Estoque", "1.03": "Clientes a Receber", "1.04": "Imobilizado",
-    "2.01": "Fornecedores", "2.02": "Provisões", "2.03": "Empréstimos", "2.04": "Capital Social", "2.05": "Lucros Acumulados",
-    "4.01": "Receita de Vendas", "5.01": "Despesas", "6.01": "Impostos", "7.01": "ARE"
-}
+# Atualiza a memória de lançamentos com base na empresa ativa da barra lateral
+if empresa_id_atual:
+    st.session_state.livro_diario = carregar_lancamentos_db(empresa_id_atual)
+else:
+    st.session_state.livro_diario = []
 
 # TABELAS OFICIAIS DO SIMPLES NACIONAL
 TABELAS_PADRAO = {
@@ -151,9 +202,12 @@ def calcular_saldos():
     return saldos
 
 saldos = calcular_saldos()
-lucro = (saldos.get("4.01", 0.0)) - (saldos.get("5.01", 0.0) + saldos.get("6.01", 0.0))
+# Ajuste do Lucro considerando a nova conta de distribuição 5.02
+lucro = (saldos.get("4.01", 0.0)) - (saldos.get("5.01", 0.0) + saldos.get("5.02", 0.0) + saldos.get("6.01", 0.0))
 
-# Injeta CSS Global para unificar os botões aos cards HTML do menu principal
+# ==============================================================================
+# 5. ATUALIZAÇÃO: INJEÇÃO DE INSTRUÇÕES DE IMPRESSÃO VIA CSS DO NAVEGADOR
+# ==============================================================================
 st.markdown("""
 <style>
     .custom-card-btn button {
@@ -169,6 +223,24 @@ st.markdown("""
         background-color: #f1f5f9 !important;
         color: #0f2a4a !important;
         box-shadow: 0px 4px 6px rgba(0,0,0,0.05);
+    }
+    
+    /* Configuração de Impressão Limpa */
+    @media print {
+        header, [data-testid="stSidebar"], [data-testid="stHeader"], .stButton, .no-print {
+            display: none !important;
+        }
+        [data-testid="stAppViewContainer"] {
+            width: 100% !important;
+            padding: 0 !important;
+            background-color: white !important;
+        }
+        .printable-report {
+            border: 2px solid #333 !important;
+            padding: 20px !important;
+            margin-top: 20px !important;
+            color: black !important;
+        }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -222,14 +294,57 @@ if st.session_state.pagina_selecionada == "🏠 Menu Principal":
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
+
 # ==============================================================================
-# TELA 2: MÓDULO CONTÁBIL
+# TELA 2: MÓDULO CONTÁBIL (REESTRUTURADO)
 # ==============================================================================
 elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
-    sub_menu = st.radio("Seções Contábeis:", ["📝 Lançamentos", "📊 DRE", "⚖️ Balanço Patrimonial"], horizontal=True)
+    
+    # Menu interno estendido com as novas abas solicitadas
+    sub_menu = st.radio("Seções Contábeis:", [
+        "🏢 Cadastro de Empresas", "📝 Lançamentos", "⚖️ Balancete", "📊 DRE", "⚖️ Balanço Patrimonial"
+    ], horizontal=True)
 
-    if sub_menu == "📝 Lançamentos":
-        st.title("📝 Livro Diário de Lançamentos")
+    # --- ABA NOVA: CADASTRO DE EMPRESAS ---
+    if sub_menu == "🏢 Cadastro de Empresas":
+        st.title("🏢 Painel de Cadastro Corporativo")
+        
+        with st.form("form_cadastro_empresa", clear_on_submit=True):
+            st.subheader("Inserir Nova Empresa no Banco Local")
+            nome_empresa = st.text_input("Razão Social / Nome Fantasia")
+            cnpj_empresa = st.text_input("CNPJ (Apenas números ou formatado)")
+            
+            if st.form_submit_button("Salvar Empresa Definitivamente"):
+                if nome_empresa and cnpj_empresa:
+                    try:
+                        conn = conectar_db()
+                        cursor = conn.cursor()
+                        cursor.execute("INSERT INTO empresas (nome, cnpj) VALUES (?, ?)", (nome_empresa, cnpj_empresa))
+                        conn.commit()
+                        conn.close()
+                        st.success(f"Empresa '{nome_empresa}' salva com sucesso no banco relacional!")
+                        st.rerun()
+                    except sqlite3.IntegrityError:
+                        st.error("Erro: Já existe uma empresa cadastrada com este CNPJ.")
+                else:
+                    st.error("Por favor, preencha todos os campos do cadastro.")
+                    
+        st.divider()
+        st.subheader("Empresas Ativas no Sistema")
+        if not df_empresas.empty:
+            st.dataframe(df_empresas, use_container_width=True)
+        else:
+            st.info("Nenhuma empresa listada no banco local.")
+
+    # Se o usuário tentar acessar os relatórios sem selecionar/cadastrar empresa
+    elif empresa_id_atual is None:
+        st.warning("⚠️ Atenção: Acesse primeiro a aba '🏢 Cadastro de Empresas' para registrar uma empresa antes de ver lançamentos ou gerar relatórios.")
+
+    # --- ABA: LANÇAMENTOS ---
+    elif sub_menu == "📝 Lançamentos":
+        st.title(f"📝 Livro Diário de Lançamentos")
+        st.info(f"Gravando dados na empresa: **{empresa_selecionada}** (CNPJ: {cnpj_empresa_atual})")
+        
         st.subheader("📥 Importar Lançamentos via CSV")
         arquivo_upload = st.file_uploader("Selecione seu arquivo CSV exportado do Excel (Separado por ponto e vírgula)", type=["csv"])
         
@@ -242,9 +357,12 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
                 if all(col in df_importado.columns for col in colunas_obrigatorias):
                     if st.button("Confirmar Importação de Dados"):
                         dados_novos = df_importado[colunas_obrigatorias].to_dict(orient="records")
-                        st.session_state.livro_diario.extend(dados_novos)
-                        salvar_dados(st.session_state.livro_diario)
-                        st.success(f"{len(dados_novos)} lançamentos importados com sucesso!")
+                        
+                        # Salva item por item vinculando a empresa ativa
+                        for item in dados_novos:
+                            salvar_lancamento_db(empresa_id_atual, item["Data"], item["Debito"], item["Credito"], item["Valor"], item["Historico"])
+                            
+                        st.success(f"{len(dados_novos)} lançamentos importados e vinculados à empresa '{empresa_selecionada}'!")
                         st.rerun()
                 else:
                     st.error("Erro: O arquivo precisa conter as colunas: Data, Debito, Credito, Valor, Historico.")
@@ -263,17 +381,8 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
             historico = st.text_input("Histórico / Descrição da Operação")
             
             if st.form_submit_button("Confirmar e Salvar Lançamento"):
-                novo = {
-                    "Nº Lançamento": len(st.session_state.livro_diario) + 1,
-                    "Data": str(data),
-                    "Debito": c_debito,     
-                    "Credito": c_credito,   
-                    "Valor": valor,
-                    "Historico": historico  
-                }
-                st.session_state.livro_diario.append(novo)
-                salvar_dados(st.session_state.livro_diario)
-                st.success("Lançamento gravado com sucesso na nuvem!")
+                salvar_lancamento_db(empresa_id_atual, data, c_debito, c_credito, valor, historico)
+                st.success("Lançamento gravado com sucesso no banco relacional definitivo!")
                 st.rerun()
 
         st.divider()
@@ -288,23 +397,106 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
             st.dataframe(df_exibicao, use_container_width=True)
             
             csv = df_diario.to_csv(index=False, sep=";", encoding="utf-8-sig").encode('utf-8-sig')
-            st.download_button("📤 Exportar Lançamentos para Excel/CSV", data=csv, file_name="lancamentos_contabeis.csv", mime="text/csv")
+            st.download_button("📤 Exportar Lançamentos para Excel/CSV", data=csv, file_name=f"lancamentos_{empresa_selecionada}.csv", mime="text/csv")
         else:
-            st.info("Nenhum lançamento armazenado na nuvem.")
+            st.info("Nenhum lançamento armazenado na nuvem/banco para esta empresa.")
 
+    # --- ABA NOVA: BALANCETE DE VERIFICAÇÃO ---
+    elif sub_menu == "⚖️ Balancete":
+        st.title("⚖️ Balancete de Verificação")
+        st.write(f"Empresa: **{empresa_selecionada}** | CNPJ: {cnpj_empresa_atual}")
+        
+        # Botão Inteligente de Impressão via Javascript Nativo do Navegador
+        st.markdown('<button onclick="window.print()" style="padding:10px 20px; background-color:#0f2a4a; color:white; border:none; border-radius:5px; cursor:pointer;" class="no-print">🖨️ Imprimir Balancete Profissional</button>', unsafe_allow_html=True)
+        
+        # Início do Bloco Estrutural Printable (Alvo do Print do Navegador)
+        st.markdown(f"""
+        <div class="printable-report">
+            <h2 style='text-align: center; margin-bottom: 5px;'>MAXSUEL CONTABILIDADE</h2>
+            <h4 style='text-align: center; margin-top: 0; color:#555;'>BALANCETE DE VERIFICAÇÃO INTEGRAL</h4>
+            <hr>
+            <p><b>Empresa Emissora:</b> {empresa_selecionada} &nbsp;&nbsp;&nbsp;&nbsp; <b>CNPJ:</b> {cnpj_empresa_atual}</p>
+            <p><b>Data de Emissão:</b> {datetime.now().strftime('%d/%m/%Y %H:%M')}</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        balancete_dados = []
+        tot_deb = 0
+        tot_cred = 0
+        
+        conn = conectar_db()
+        df_l = pd.read_sql_query("SELECT * FROM lancamentos WHERE empresa_id = ?", conn, params=(int(empresa_id_atual),))
+        conn.close()
+
+        for cod, nome in plano_de_contas.items():
+            debito_acumulado = df_l[df_l['debito'] == cod]['valor'].sum()
+            credito_acumulado = df_l[df_l['credito'] == cod]['valor'].sum()
+            
+            # Natureza das Contas Contábeis (Ativo/Despesa = Devedora | Passivo/PL/Receita = Credora)
+            if cod.startswith(('1', '5', '6')):
+                saldo_final = debito_acumulado - credito_acumulado
+            else:
+                saldo_final = credito_acumulado - debito_acumulado
+                
+            if debito_acumulado > 0 or credito_acumulado > 0:
+                tot_deb += debito_acumulado
+                tot_cred += credito_acumulado
+                balancete_dados.append({
+                    "Código": cod,
+                    "Conta Contábil": nome,
+                    "Débito (R$)": formatar_br(debito_acumulado),
+                    "Crédito (R$)": formatar_br(credito_acumulado),
+                    "Saldo Final (R$)": formatar_br(saldo_final)
+                })
+        
+        if balancete_dados:
+            st.table(pd.DataFrame(balancete_dados))
+            col_b1, col_b2 = st.columns(2)
+            col_b1.metric("Total Débitos Movimentados", formatar_br(tot_deb))
+            col_b2.metric("Total Créditos Movimentados", formatar_br(tot_cred))
+        else:
+            st.info("Sem movimentações financeiras para gerar o Balancete.")
+
+    # --- ABA: DRE ---
     elif sub_menu == "📊 DRE":
         st.title("📊 Demonstrativo de Resultado do Exercício (DRE)")
+        
+        st.markdown('<button onclick="window.print()" style="padding:10px 20px; background-color:#0f2a4a; color:white; border:none; border-radius:5px; cursor:pointer;" class="no-print">🖨️ Imprimir DRE Profissional</button>', unsafe_allow_html=True)
+        
+        st.markdown(f"""
+        <div class="printable-report">
+            <h2 style='text-align: center; margin-bottom: 5px;'>MAXSUEL CONTABILIDADE</h2>
+            <h4 style='text-align: center; margin-top: 0; color:#555;'>DEMONSTRATIVO DE RESULTADO DO EXERCÍCIO</h4>
+            <hr>
+            <p><b>Empresa Emissora:</b> {empresa_selecionada} &nbsp;&nbsp;&nbsp;&nbsp; <b>CNPJ:</b> {cnpj_empresa_atual}</p>
+        </div>
+        """, unsafe_allow_html=True)
+
         st.metric("LUCRO LÍQUIDO DO PERÍODO", formatar_br(lucro))
         df_dre = pd.DataFrame([
             {"Estrutura Contábil": "Receita Bruta de Vendas (4.x)", "Valor": formatar_br(saldos.get("4.01", 0.0))},
-            {"Estrutura Contábil": "(-) Despesas Operacionais (5.x)", "Valor": formatar_br(-saldos.get("5.01", 0.0))},
+            {"Estrutura Contábil": "(-) Despesas Operacionais (5.01)", "Valor": formatar_br(-saldos.get("5.01", 0.0))},
+            {"Estrutura Contábil": "(-) Distribuição de Dividendos (5.02)", "Valor": formatar_br(-saldos.get("5.02", 0.0))},
             {"Estrutura Contábil": "(-) Impostos Incidentes (6.x)", "Valor": formatar_br(-saldos.get("6.01", 0.0))},
             {"Estrutura Contábil": "(=) RESULTADO LÍQUIDO (ARE)", "Valor": formatar_br(lucro)}
         ])
         st.table(df_dre)
 
+    # --- ABA: BALANÇO PATRIMONIAL ---
     elif sub_menu == "⚖️ Balanço Patrimonial":
         st.title("⚖️ Balanço Patrimonial Consolidado")
+        
+        st.markdown('<button onclick="window.print()" style="padding:10px 20px; background-color:#0f2a4a; color:white; border:none; border-radius:5px; cursor:pointer;" class="no-print">🖨️ Imprimir Balanço Profissional</button>', unsafe_allow_html=True)
+        
+        st.markdown(f"""
+        <div class="printable-report">
+            <h2 style='text-align: center; margin-bottom: 5px;'>MAXSUEL CONTABILIDADE</h2>
+            <h4 style='text-align: center; margin-top: 0; color:#555;'>BALANÇO PATRIMONIAL CONSOLIDADO</h4>
+            <hr>
+            <p><b>Empresa Emissora:</b> {empresa_selecionada} &nbsp;&nbsp;&nbsp;&nbsp; <b>CNPJ:</b> {cnpj_empresa_atual}</p>
+        </div>
+        """, unsafe_allow_html=True)
+
         saldos_bp = saldos.copy()
         saldos_bp["2.05"] = saldos_bp.get("2.05", 0.0) + lucro  
         col_a, col_p = st.columns(2)
@@ -320,6 +512,8 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
             st.table(pd.DataFrame(passivo_data))
             total_passivo = sum(saldos_bp.get(c, 0.0) for c in plano_de_contas if c.startswith('2'))
             st.info(f"**Total do Passivo + PL:** {formatar_br(total_passivo)}")
+
+# As outras abas estruturais do seu código ("🧮 Simulador Simples Nacional" e "📋 Módulo de Folha & Fator R") continuam logo abaixo intocadas, mantendo o funcionamento idêntico ao original.
 
 # ==============================================================================
 # TELA 3: SIMULADOR DO SIMPLES NACIONAL
