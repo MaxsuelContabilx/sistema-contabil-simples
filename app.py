@@ -713,6 +713,7 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
     tabelas_calculo = {k: list(v) for k, v in TABELAS_PADRAO.items()}
     resultados = []
     detalhes_impostos = {}
+    df_rateio_impressao = pd.DataFrame()  # 👈 ADICIONE ESTA LINHA AQUI!
 
     # Alíquotas do IBS e CBS já aplicadas as reduções de 30% ou 60%
     aliq_cbs_efetiva = (cbs_ref / 100.0) * (1.0 - reducao_pct)
@@ -849,7 +850,7 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
         """
         
     html_linhas_rateio = ""
-    if not df_rateio_impressao.empty:
+    if 'df_rateio_impressao' in locals() and not df_rateio_impressao.empty:
         for idx, row in df_rateio_impressao.iterrows():
             html_linhas_rateio += f"<tr><td>{row['Imposto']}</td><td>{formatar_br(row['Valor Destinado'])}</td></tr>"
 
