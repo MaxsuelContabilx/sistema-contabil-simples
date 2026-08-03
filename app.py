@@ -784,21 +784,53 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
             })
 
     # --------------------------------------------------------------------------
-    # 4. PAINEL COMPARATIVO COMPLETO
+    # 4. PAINEL COMPARATIVO COMPLETO C/ CORES E CARDS
     # --------------------------------------------------------------------------
     st.subheader("📊 Painel Comparativo: Simples Unificado vs. IBS/CBS Por Fora")
     
     df_res = pd.DataFrame(resultados)
-    df_res_exibir = df_res.copy()
     
-    # Formatação de Moeda
-    colunas_moeda = ["DAS Tradicional", "DAS Reduzido", "CBS Por Fora", "IBS Por Fora", "Carga Total (Reforma)", "Diferença (R$)"]
+    # Função para colorir a coluna de Diferença
+    def colorir_diferenca(val):
+        if val > 0:
+            return 'color: #ef4444; font-weight: bold;'  # Vermelho se aumentou o imposto
+        elif val < 0:
+            return 'color: #22c55e; font-weight: bold;'  # Verde se diminuiu o imposto
+        return 'color: #6b7280;'
+
+    # Cópia formatada para exibição
+    df_res_exibir = df_res.copy()
+    colunas_moeda = ["DAS Tradicional", "DAS Reduzido", "CBS Por Fora", "IBS Por Fora", "Carga Total (Reforma)"]
     for col in colunas_moeda:
         df_res_exibir[col] = df_res_exibir[col].apply(formatar_br)
-        
-    st.dataframe(df_res_exibir, use_container_width=True, hide_index=True)
+
+    # Exibição da tabela com destaque de cores na Diferença
+    st.dataframe(
+        df_res_exibir.style.map(colorir_diferenca, subset=["Diferença (R$)"]).format({"Diferença (R$)": formatar_br}),
+        use_container_width=True,
+        hide_index=True
+    )
     
-    st.caption("💡 **Dica do Especialista:** *Diferença positiva significa que 'Por Fora' paga mais caixa direto. Porém, em operações B2B, repassar crédito integral de CBS/IBS fecha muito mais contratos com grandes empresas.*")
+    # --------------------------------------------------------------------------
+    # 💡 DIAGNÓSTICO ESTRATÉGICO AUTOMÁTICO (CARD RESUMO)
+    # --------------------------------------------------------------------------
+    if anexo_detalhe in [r["Anexo"] for r in resultados]:
+        res_anexo = next(r for r in resultados if r["Anexo"] == anexo_detalhe)
+        dif = res_anexo["Diferença (R$)"]
+        
+        st.markdown("### 💡 Diagnóstico do Anexo Selecionado")
+        col_c1, col_c2 = st.columns(2)
+        
+        with col_c1:
+            if dif > 0:
+                st.error(f"🔴 **Para Vendas B2C (Consumidor Final):** Mantendo no **Simples Tradicional** você economiza **{formatar_br(abs(dif))}** por mês.")
+            elif dif < 0:
+                st.success(f"🟢 **Para Vendas B2C (Consumidor Final):** Optar por **Recolher Por Fora** gera **{formatar_br(abs(dif))}** de economia mensal!")
+            else:
+                st.info("⚖️ **Carga Equivalente:** Ambas as opções geram o mesmo valor de imposto a pagar.")
+                
+        with col_c2:
+            st.warning(f"🔵 **Para Vendas B2B (Empresas):** Apurar por fora transfere **crédito integral de IBS/CBS** para seus clientes PJ, aumentando sua competitividade comercial.")
 
     # --------------------------------------------------------------------------
     # 5. DETALHAMENTO DO RATEIO
