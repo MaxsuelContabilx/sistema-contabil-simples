@@ -814,23 +814,25 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
     # --------------------------------------------------------------------------
     # 💡 DIAGNÓSTICO ESTRATÉGICO AUTOMÁTICO (CARD RESUMO)
     # --------------------------------------------------------------------------
-    if anexo_detalhe in [r["Anexo"] for r in resultados]:
-        res_anexo = next(r for r in resultados if r["Anexo"] == anexo_detalhe)
+    if resultados:
+        st.markdown("### 💡 Diagnóstico da Simulação")
+        
+        # Pega o primeiro anexo por padrão para a análise inicial
+        res_anexo = resultados[0] 
         dif = res_anexo["Diferença (R$)"]
         
-        st.markdown("### 💡 Diagnóstico do Anexo Selecionado")
         col_c1, col_c2 = st.columns(2)
         
         with col_c1:
             if dif > 0:
-                st.error(f"🔴 **Para Vendas B2C (Consumidor Final):** Mantendo no **Simples Tradicional** você economiza **{formatar_br(abs(dif))}** por mês.")
+                st.error(f"🔴 **Para Vendas B2C (Consumidor Final):** Mantendo no **Simples Tradicional** você economiza até **{formatar_br(abs(dif))}** por mês.")
             elif dif < 0:
                 st.success(f"🟢 **Para Vendas B2C (Consumidor Final):** Optar por **Recolher Por Fora** gera **{formatar_br(abs(dif))}** de economia mensal!")
             else:
                 st.info("⚖️ **Carga Equivalente:** Ambas as opções geram o mesmo valor de imposto a pagar.")
                 
         with col_c2:
-            st.warning(f"🔵 **Para Vendas B2B (Empresas):** Apurar por fora transfere **crédito integral de IBS/CBS** para seus clientes PJ, aumentando sua competitividade comercial.")
+            st.warning("🔵 **Para Vendas B2B (Empresas):** Apurar por fora transfere **crédito integral de IBS/CBS** para seus clientes PJ, aumentando muito sua competitividade de vendas.")
 
     # --------------------------------------------------------------------------
     # 5. DETALHAMENTO DO RATEIO
