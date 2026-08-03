@@ -824,11 +824,29 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
     st.divider()
     st.subheader("🖨️ Imprimir Simulação")
     
-    # Construção do documento HTML customizado para impressão
+   # ==============================================================================
+    # CONSTRUÇÃO DO DOCUMENTO HTML CUSTOMIZADO PARA IMPRESSÃO (REFORMA TRIBUTÁRIA)
+    # ==============================================================================
     html_linhas_tabela = ""
     for r in resultados:
-        imp_v = formatar_br(r["Imposto Mensal"]) if isinstance(r["Imposto Mensal"], (int, float)) else r["Imposto Mensal"]
-        html_linhas_tabela += f"<tr><td>{r['Anexo']}</td><td>{r['Alíquota Nominal']}</td><td>{r['Alíquota Efetiva Real']}</td><td><b>{imp_v}</b></td></tr>"
+        das_trad = formatar_br(r["DAS Tradicional"]) if isinstance(r["DAS Tradicional"], (int, float)) else r["DAS Tradicional"]
+        das_red = formatar_br(r["DAS Reduzido"]) if isinstance(r["DAS Reduzido"], (int, float)) else r["DAS Reduzido"]
+        cbs_v = formatar_br(r["CBS Por Fora"]) if isinstance(r["CBS Por Fora"], (int, float)) else r["CBS Por Fora"]
+        ibs_v = formatar_br(r["IBS Por Fora"]) if isinstance(r["IBS Por Fora"], (int, float)) else r["IBS Por Fora"]
+        total_v = formatar_br(r["Carga Total (Reforma)"]) if isinstance(r["Carga Total (Reforma)"], (int, float)) else r["Carga Total (Reforma)"]
+        dif_v = formatar_br(r["Diferença (R$)"]) if isinstance(r["Diferença (R$)"], (int, float)) else r["Diferença (R$)"]
+        
+        html_linhas_tabela += f"""
+        <tr>
+            <td>{r['Anexo']}</td>
+            <td>{das_trad}</td>
+            <td>{das_red}</td>
+            <td>{cbs_v}</td>
+            <td>{ibs_v}</td>
+            <td><b>{total_v}</b></td>
+            <td>{dif_v}</td>
+        </tr>
+        """
         
     html_linhas_rateio = ""
     if not df_rateio_impressao.empty:
@@ -843,7 +861,7 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
     <html>
     <head>
         <meta charset="utf-8">
-        <title>Simulação Simples Nacional - Maxsuel Contabilidade</title>
+        <title>Simulação Simples Nacional + Reforma Tributária - Maxsuel Contabilidade</title>
         <style>
             body {{ font-family: 'Segoe UI', Arial, sans-serif; margin: 40px; color: #333; line-height: 1.5; }}
             .header {{ display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #0f2a4a; padding-bottom: 15px; margin-bottom: 30px; }}
@@ -852,11 +870,11 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
             .title {{ color: #0f2a4a; font-size: 24px; font-weight: bold; margin: 0 0 5px 0; }}
             .subtitle {{ color: #555; font-size: 15px; margin: 0; }}
             .section-title {{ color: #0f2a4a; font-size: 16px; font-weight: bold; margin-top: 30px; margin-bottom: 12px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }}
-            .grid-params {{ display: flex; gap: 40px; background: #f8fafc; padding: 15px; border-radius: 6px; margin-bottom: 25px; border: 1px solid #e2e8f0; }}
-            .param-item {{ font-size: 14px; }}
-            table {{ width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 14px; }}
-            th, td {{ border: 1px solid #cbd5e1; padding: 10px 12px; text-align: left; }}
-            th {{ background-color: #0f2a4a; color: white; font-weight: 600; }}
+            .grid-params {{ display: flex; flex-wrap: wrap; gap: 20px 40px; background: #f8fafc; padding: 15px; border-radius: 6px; margin-bottom: 25px; border: 1px solid #e2e8f0; }}
+            .param-item {{ font-size: 13px; }}
+            table {{ width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 13px; }}
+            th, td {{ border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; }}
+            th {{ background-color: #0f2a4a; color: white; font-weight: 600; font-size: 12px; }}
             tr:nth-child(even) {{ background-color: #f8fafc; }}
             .footer {{ margin-top: 50px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 15px; }}
             @media print {{
@@ -869,7 +887,7 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
         <div class="header">
             <div>
                 <h1 class="title">Maxsuel Contabilidade</h1>
-                <p class="subtitle">Relatório Estratégico de Planejamento Tributário</p>
+                <p class="subtitle">Relatório Estratégico de Planejamento Tributário - Reforma Tributária</p>
             </div>
             <div>{logo_tag}</div>
         </div>
@@ -881,17 +899,23 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
         <div class="section-title">Parâmetros de Entrada Aplicados</div>
         <div class="grid-params">
             <div class="param-item"><b>Receita Acumulada (RBT12):</b> {formatar_br(rbt12)}</div>
-            <div class="param-item"><b>Faturamento Projetado para o Mês:</b> {formatar_br(faturamento_mes)}</div>
+            <div class="param-item"><b>Faturamento Projetado no Mês:</b> {formatar_br(faturamento_mes)}</div>
+            <div class="param-item"><b>Insumos c/ Crédito:</b> {formatar_br(compras_insumos)}</div>
+            <div class="param-item"><b>CBS Ref. / IBS Ref.:</b> {cbs_ref:.1f}% / {ibs_ref:.1f}%</div>
+            <div class="param-item"><b>Benefício LC 214:</b> {reducao_rotulo}</div>
         </div>
 
-        <div class="section-title">Painel Comparativo de Cenários (Simples Nacional)</div>
+        <div class="section-title">Painel Comparativo de Cenários (Simples Unificado vs. IBS/CBS Por Fora)</div>
         <table>
             <thead>
                 <tr>
                     <th>Anexo Fiscal</th>
-                    <th>Alíquota Nominal</th>
-                    <th>Alíquota Efetiva Real</th>
-                    <th>Imposto Mensal Apurado</th>
+                    <th>DAS Tradicional</th>
+                    <th>DAS Reduzido</th>
+                    <th>CBS Por Fora</th>
+                    <th>IBS Por Fora</th>
+                    <th>Carga Total (Reforma)</th>
+                    <th>Diferença (R$)</th>
                 </tr>
             </thead>
             <tbody>
@@ -899,7 +923,7 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
             </tbody>
         </table>
 
-        <div class="section-title">Detalhamento de Rateio Interno da Guia - {anexo_detalhe}</div>
+        <div class="section-title">Detalhamento de Rateio Interno da Guia - {anexo_detalhe} (DAS Tradicional)</div>
         <table style="max-width: 500px;">
             <thead>
                 <tr>
@@ -928,7 +952,7 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
     st.download_button(
         label="🖨️ Baixar e Imprimir Relatório Fiscal",
         data=html_template,
-        file_name=f"Simulacao_Simples_Nacional_{datetime.now().strftime('%Y%m%d')}.html",
+        file_name=f"Simulacao_Simples_Nacional_Reforma_{datetime.now().strftime('%Y%m%d')}.html",
         mime="text/html",
         use_container_width=True
     )
