@@ -705,7 +705,7 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
         reducao_rotulo = col_ref3.selectbox("Redução de Alíquota (LC 214):", list(opcoes_reducao.keys()))
         reducao_pct = opcoes_reducao[reducao_rotulo]
         
-        compras_insumos = col_ref4.number_input("Compras/Insumos c/ Crédito (Mês):", min_value=0.00, value=5000.00, format="%.2f")
+        compras_insumos = col_ref4.number_input("Compras/Insumos c/ Crédito (Mês):", min_value=0.00, value=0.00, format="%.2f")
 
     # --------------------------------------------------------------------------
     # 3. MOTORES DE CÁLCULO
