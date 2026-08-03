@@ -676,18 +676,52 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
 # As outras abas estruturais do seu código ("🧮 Simulador Simples Nacional" e "📋 Módulo de Folha & Fator R") continuam logo abaixo intocadas, mantendo o funcionamento idêntico ao original.
 
 # ==============================================================================
-# TELA 3: SIMULADOR DO SIMPLES NACIONAL
+# TELA 3: SIMULADOR DO SIMPLES NACIONAL + REFORMA TRIBUTÁRIA
 # ==============================================================================
 elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
-    st.title("🧮 Super Simulador Comparativo do Simples Nacional")
+    st.title("🧮 Super Simulador Comparativo do Simples Nacional + Reforma Tributária")
     
+    # --------------------------------------------------------------------------
+    # 1. ENTRADAS BÁSICAS DO SIMPLES
+    # --------------------------------------------------------------------------
     col_in1, col_in2 = st.columns(2)
     rbt12 = col_in1.number_input("Receita Acumulada nos últimos 12 meses (RBT12):", min_value=0.00, value=250000.00, format="%.2f")
     faturamento_mes = col_in2.number_input("Faturamento Estimado para o Mês Atual:", min_value=0.00, value=20000.00, format="%.2f")
     
+    # --------------------------------------------------------------------------
+    # 2. ENTRADAS DA REFORMA TRIBUTÁRIA (CBS & IBS POR FORA)
+    # --------------------------------------------------------------------------
+    with st.expander("⚙️ Parâmetros da Reforma Tributária (Apurando CBS/IBS Por Fora)", expanded=True):
+        col_ref1, col_ref2, col_ref3, col_ref4 = st.columns(4)
+        
+        cbs_ref = col_ref1.number_input("CBS Ref. (%):", min_value=0.0, max_value=30.0, value=8.8, step=0.1)
+        ibs_ref = col_ref2.number_input("IBS Ref. (%):", min_value=0.0, max_value=30.0, value=17.7, step=0.1)
+        
+        opcoes_reducao = {
+            "0% - Regra Geral (Sem Desconto)": 0.0,
+            "30% - Profissões Regulamentadas": 0.30,
+            "60% - Saúde, Educação, Agro, etc.": 0.60
+        }
+        reducao_rotulo = col_ref3.selectbox("Redução de Alíquota (LC 214):", list(opcoes_reducao.keys()))
+        reducao_pct = opcoes_reducao[reducao_rotulo]
+        
+        compras_insumos = col_ref4.number_input("Compras/Insumos c/ Crédito (Mês):", min_value=0.00, value=5000.00, format="%.2f")
+
+    # --------------------------------------------------------------------------
+    # 3. MOTORES DE CÁLCULO
+    # --------------------------------------------------------------------------
     tabelas_calculo = {k: list(v) for k, v in TABELAS_PADRAO.items()}
     resultados = []
     detalhes_impostos = {}
+
+    # Alíquotas do IBS e CBS já aplicadas as reduções de 30% ou 60%
+    aliq_cbs_efetiva = (cbs_ref / 100.0) * (1.0 - reducao_pct)
+    aliq_ibs_efetiva = (ibs_ref / 100.0) * (1.0 - reducao_pct)
+
+    # Base de cálculo do IBS/CBS Não-Cumulativo (Débito sobre vendas - Crédito sobre insumos)
+    base_liquida_insumos = max(0.0, faturamento_mes - compras_insumos)
+    cbs_por_fora = base_liquida_insumos * aliq_cbs_efetiva
+    ibs_por_fora = base_liquida_insumos * aliq_ibs_efetiva
 
     for nome_anexo, faixas in tabelas_calculo.items():
         rbt12_calculo = rbt12 if rbt12 > 0 else (faturamento_mes if faturamento_mes > 0 else 1.0)
@@ -701,39 +735,80 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
                 break
         
         if encontrou:
-            if rbt12 == 0: aliquota_efetiva = aliquota_nominal
-            else: aliquota_efetiva = ((rbt12 * aliquota_nominal) - deducao) / rbt12
+            if rbt12 == 0: 
+                aliquota_efetiva = aliquota_nominal
+            else: 
+                aliquota_efetiva = ((rbt12 * aliquota_nominal) - deducao) / rbt12
             
             aliquota_efetiva = max(0.0, aliquota_efetiva)
-            imposto_total = faturamento_mes * aliquota_efetiva
+            imposto_tradicional = faturamento_mes * aliquota_efetiva
+            
+            # --- LÓGICA REFORMA TRIBUTÁRIA (EXCLUSÃO DO DAS) ---
+            rateio = REPARTICAO_IMPOSTOS[nome_anexo]
+            
+            # Soma a fatia dos tributos extintos e migrados pro IBS/CBS (PIS, COFINS, ICMS, ISS, IPI)
+            pct_substituido = sum(
+                pct for imp, pct in rateio.items() 
+                if any(t in imp.upper() for t in ["PIS", "COFINS", "ICMS", "ISS", "IPI"])
+            )
+            
+            # O DAS reduzido cobra apenas os impostos restantes (CPP, IRPJ, CSLL)
+            aliq_das_reduzido = aliquota_efetiva * (1.0 - pct_substituido)
+            das_reduzido = faturamento_mes * aliq_das_reduzido
+            
+            # Carga Tributária Total na opção "Por Fora"
+            total_por_fora = das_reduzido + cbs_por_fora + ibs_por_fora
+            diferenca = total_por_fora - imposto_tradicional
             
             resultados.append({
                 "Anexo": nome_anexo,
-                "Alíquota Nominal": f"{aliquota_nominal*100:.2f}%",
-                "Alíquota Efetiva Real": f"{aliquota_efetiva*100:.2f}%",
-                "Imposto Mensal": imposto_total
+                "DAS Tradicional": imposto_tradicional,
+                "DAS Reduzido": das_reduzido,
+                "CBS Por Fora": cbs_por_fora,
+                "IBS Por Fora": ibs_por_fora,
+                "Carga Total (Reforma)": total_por_fora,
+                "Diferença (R$)": diferenca
             })
             
-            rateio = REPARTICAO_IMPOSTOS[nome_anexo]
-            detalhes_impostos[nome_anexo] = {imp: imposto_total * pct for imp, pct in rateio.items()}
+            detalhes_impostos[nome_anexo] = {imp: imposto_tradicional * pct for imp, pct in rateio.items()}
         else:
-            resultados.append({"Anexo": nome_anexo, "Alíquota Nominal": "Excedido", "Alíquota Efetiva Real": "Excedido", "Imposto Mensal": 0.0})
+            resultados.append({
+                "Anexo": nome_anexo, 
+                "DAS Tradicional": 0.0, 
+                "DAS Reduzido": 0.0, 
+                "CBS Por Fora": 0.0, 
+                "IBS Por Fora": 0.0, 
+                "Carga Total (Reforma)": 0.0, 
+                "Diferença (R$)": 0.0
+            })
 
-    st.subheader("📊 Painel Comparativo de Cenários")
+    # --------------------------------------------------------------------------
+    # 4. PAINEL COMPARATIVO COMPLETO
+    # --------------------------------------------------------------------------
+    st.subheader("📊 Painel Comparativo: Simples Unificado vs. IBS/CBS Por Fora")
+    
     df_res = pd.DataFrame(resultados)
     df_res_exibir = df_res.copy()
-    df_res_exibir["Imposto Mensal"] = df_res_exibir["Imposto Mensal"].apply(formatar_br)
-    st.table(df_res_exibir)
     
+    # Formatação de Moeda
+    colunas_moeda = ["DAS Tradicional", "DAS Reduzido", "CBS Por Fora", "IBS Por Fora", "Carga Total (Reforma)", "Diferença (R$)"]
+    for col in colunas_moeda:
+        df_res_exibir[col] = df_res_exibir[col].apply(formatar_br)
+        
+    st.dataframe(df_res_exibir, use_container_width=True, hide_index=True)
+    
+    st.caption("💡 **Dica do Especialista:** *Diferença positiva significa que 'Por Fora' paga mais caixa direto. Porém, em operações B2B, repassar crédito integral de CBS/IBS fecha muito mais contratos com grandes empresas.*")
+
+    # --------------------------------------------------------------------------
+    # 5. DETALHAMENTO DO RATEIO
+    # --------------------------------------------------------------------------
     st.divider()
-    st.subheader("🔀 Detalhamento e Rateio Interno dos Impostos")
+    st.subheader("🔀 Detalhamento e Rateio Interno (DAS Tradicional)")
     anexo_detalhe = st.selectbox("Escolha um Anexo para enxergar a divisão da guia do imposto:", list(TABELAS_PADRAO.keys()))
     
-    df_rateio_impressao = pd.DataFrame()
     if anexo_detalhe in detalhes_impostos:
         dict_impostos = detalhes_impostos[anexo_detalhe]
         df_rateio = pd.DataFrame([{"Imposto": k, "Valor Destinado": v} for k, v in dict_impostos.items() if v > 0])
-        df_rateio_impressao = df_rateio.copy()
         
         col_graf1, col_graf2 = st.columns([1, 1])
         with col_graf1:
