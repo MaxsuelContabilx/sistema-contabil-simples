@@ -812,12 +812,14 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
     )
     
     # --------------------------------------------------------------------------
-    # 💡 DIAGNÓSTICO ESTRATÉGICO AUTOMÁTICO (CARD RESUMO)
+   # --------------------------------------------------------------------------
+    # 💡 DIAGNÓSTICO ESTRATÉGICO E LAUDO FISCAL (EXIBIÇÃO NA TELA)
     # --------------------------------------------------------------------------
     if resultados:
-        st.markdown("### 💡 Diagnóstico da Simulação")
+        st.divider()
+        st.subheader("💡 Diagnóstico Estratégico e Parecer Fiscal")
         
-        # Pega o primeiro anexo por padrão para a análise inicial
+        # Considera o primeiro anexo da simulação para a análise do card
         res_anexo = resultados[0] 
         dif = res_anexo["Diferença (R$)"]
         
@@ -825,21 +827,34 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
         
         with col_c1:
             if dif > 0:
-                st.error(f"🔴 **Para Vendas B2C (Consumidor Final):** Mantendo no **Simples Tradicional** você economiza até **{formatar_br(abs(dif))}** por mês.")
+                st.error(
+                    f"🔴 **Recomendação B2C (Consumidor Final):** Mantendo no **Simples Tradicional** "
+                    f"você economiza **{formatar_br(abs(dif))}** por mês no caixa da empresa em relação ao modelo por fora."
+                )
             elif dif < 0:
-                st.success(f"🟢 **Para Vendas B2C (Consumidor Final):** Optar por **Recolher Por Fora** gera **{formatar_br(abs(dif))}** de economia mensal!")
+                st.success(
+                    f"🟢 **Recomendação B2C (Consumidor Final):** Optar por **Recolher Por Fora (IBS/CBS)** "
+                    f"gera uma economia mensal de **{formatar_br(abs(dif))}**!"
+                )
             else:
-                st.info("⚖️ **Carga Equivalente:** Ambas as opções geram o mesmo valor de imposto a pagar.")
+                st.info("⚖️ **Carga Equivalente:** Ambas as opções resultam no mesmo valor final de tributo.")
                 
         with col_c2:
-            st.warning("🔵 **Para Vendas B2B (Empresas):** Apurar por fora transfere **crédito integral de IBS/CBS** para seus clientes PJ, aumentando muito sua competitividade de vendas.")
+            st.warning(
+                "🔵 **Estratégia B2B (Vendas para Empresas):** Apurar IBS/CBS por fora transfere **crédito integral** "
+                "para seus clientes PJ, garantindo maior apelo comercial e competitividade no mercado corporativo."
+            )
 
     # --------------------------------------------------------------------------
-    # 5. DETALHAMENTO DO RATEIO E IMPRESSÃO COMPLETA
+    # 5. DETALHAMENTO DO RATEIO E GRÁFICO (TELA E IMPRESSÃO)
     # --------------------------------------------------------------------------
     st.divider()
-    st.subheader("🔀 Detalhamento e Rateio Interno (DAS Tradicional)")
-    anexo_detalhe = st.selectbox("Escolha um Anexo para enxergar a divisão da guia do imposto:", list(TABELAS_PADRAO.keys()))
+    st.subheader("🔀 Detalhamento e Rateio Interno da Guia (DAS Tradicional)")
+    
+    anexo_detalhe = st.selectbox(
+        "Escolha um Anexo para analisar a decomposição do imposto:", 
+        list(TABELAS_PADRAO.keys())
+    )
     
     df_rateio_impressao = pd.DataFrame()
 
@@ -851,10 +866,13 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
         
         col_graf1, col_graf2 = st.columns([1, 1])
         with col_graf1:
+            st.markdown(f"**Valores destinados por tributo ({anexo_detalhe}):**")
             df_rateio_exibir = df_rateio.copy()
             df_rateio_exibir["Valor Destinado"] = df_rateio_exibir["Valor Destinado"].apply(formatar_br)
             st.table(df_rateio_exibir)
+            
         with col_graf2:
+            st.markdown("**Distribuição Proporcional da Guia:**")
             st.bar_chart(df_rateio.set_index("Imposto"))
 
     # ==============================================================================
@@ -863,7 +881,7 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
     st.divider()
     st.subheader("🖨️ Imprimir Simulação")
     
-    # Prepara Diagnóstico Estratégico para o Relatório Impresso
+    # Prepara os dados do Diagnóstico para o HTML
     res_anexo_imp = resultados[0] if resultados else {}
     dif_imp = res_anexo_imp.get("Diferença (R$)", 0)
     
@@ -871,14 +889,14 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
         html_diag_b2c = f"""
         <div style="background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 10px 14px; margin-bottom: 10px; border-radius: 4px;">
             <b style="color: #991b1b;">🔴 Recomendação Vendas B2C (Consumidor Final):</b><br>
-            <span style="font-size: 12px; color: #7f1d1d;">Mantendo no <b>Simples Tradicional</b> a empresa economiza até <b>{formatar_br(abs(dif_imp))}</b> por mês em relação ao modelo híbrido.</span>
+            <span style="font-size: 12px; color: #7f1d1d;">Mantendo no <b>Simples Tradicional</b> a empresa economiza até <b>{formatar_br(abs(dif_imp))}</b> por mês.</span>
         </div>
         """
     elif dif_imp < 0:
         html_diag_b2c = f"""
         <div style="background-color: #f0fdf4; border-left: 4px solid #22c55e; padding: 10px 14px; margin-bottom: 10px; border-radius: 4px;">
             <b style="color: #166534;">🟢 Recomendação Vendas B2C (Consumidor Final):</b><br>
-            <span style="font-size: 12px; color: #14532d;">Optar por <b>Recolher Por Fora</b> gera <b>{formatar_br(abs(dif_imp))}</b> de economia mensal diretamente no caixa!</span>
+            <span style="font-size: 12px; color: #14532d;">Optar por <b>Recolher Por Fora</b> gera <b>{formatar_br(abs(dif_imp))}</b> de economia mensal!</span>
         </div>
         """
     else:
@@ -892,11 +910,11 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
     html_diag_b2b = """
     <div style="background-color: #f0f9ff; border-left: 4px solid #0284c7; padding: 10px 14px; margin-bottom: 15px; border-radius: 4px;">
         <b style="color: #075985;">🔵 Posicionamento Estratégico Vendas B2B (Empresas):</b><br>
-        <span style="font-size: 12px; color: #0c4a6e;">Apurar IBS/CBS por fora transfere <b>crédito tributário integral</b> aos clientes PJ, tornando o preço de venda significativamente mais competitivo nas negociações corporativas.</span>
+        <span style="font-size: 12px; color: #0c4a6e;">Apurar IBS/CBS por fora transfere <b>crédito tributário integral</b> aos clientes PJ.</span>
     </div>
     """
 
-    # Monta Tabela Comparativa de Resultados
+    # Linhas do Painel Comparativo para a Tabela HTML
     html_linhas_tabela = ""
     for r in resultados:
         das_trad = formatar_br(r["DAS Tradicional"]) if isinstance(r["DAS Tradicional"], (int, float)) else r["DAS Tradicional"]
@@ -920,7 +938,7 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
         </tr>
         """
         
-    # Monta Tabela e Gráfico HTML de Rateio para a Página 2
+    # Rateio e Gráfico em HTML para a Folha 2 da Impressão
     html_linhas_rateio = ""
     html_barras_grafico = ""
     
@@ -1020,7 +1038,7 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
         {html_diag_b2c}
         {html_diag_b2b}
 
-        <!-- INÍCIO DA PÁGINA 2 -->
+        <!-- PÁGINA 2 DO PDF IMPRESSO -->
         <div class="page-break"></div>
         
         <div class="section-title" style="margin-top: 20px;">Detalhamento de Rateio Interno da Guia - {anexo_detalhe} (DAS Tradicional)</div>
