@@ -841,14 +841,12 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
     st.subheader("🔀 Detalhamento e Rateio Interno (DAS Tradicional)")
     anexo_detalhe = st.selectbox("Escolha um Anexo para enxergar a divisão da guia do imposto:", list(TABELAS_PADRAO.keys()))
     
-    # Inicializa a variável de impressão com segurança
     df_rateio_impressao = pd.DataFrame()
 
     if anexo_detalhe in detalhes_impostos:
         dict_impostos = detalhes_impostos[anexo_detalhe]
         df_rateio = pd.DataFrame([{"Imposto": k, "Valor Destinado": v} for k, v in dict_impostos.items() if v > 0])
         
-        # Alimenta a variável que a impressão vai ler
         df_rateio_impressao = df_rateio.copy()
         
         col_graf1, col_graf2 = st.columns([1, 1])
@@ -873,7 +871,6 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
         ibs_v = formatar_br(r["IBS Por Fora"]) if isinstance(r["IBS Por Fora"], (int, float)) else r["IBS Por Fora"]
         total_v = formatar_br(r["Carga Total (Reforma)"]) if isinstance(r["Carga Total (Reforma)"], (int, float)) else r["Carga Total (Reforma)"]
         
-        # Cores dinâmicas para a diferença (Vermelho se aumentou, Verde se economizou)
         cor_dif = "#ef4444" if r["Diferença (R$)"] > 0 else ("#22c55e" if r["Diferença (R$)"] < 0 else "#333")
         dif_v = formatar_br(r["Diferença (R$)"]) if isinstance(r["Diferença (R$)"], (int, float)) else r["Diferença (R$)"]
         
@@ -904,23 +901,27 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
         <meta charset="utf-8">
         <title>Simulação Simples Nacional + Reforma Tributária - Maxsuel Contabilidade</title>
         <style>
-            body {{ font-family: 'Segoe UI', Arial, sans-serif; margin: 40px; color: #333; line-height: 1.5; }}
-            .header {{ display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #0f2a4a; padding-bottom: 15px; margin-bottom: 30px; }}
-            .logo {{ max-height: 75px; max-width: 220px; object-fit: contain; }}
-            .header-info {{ text-align: right; font-size: 13px; color: #666; }}
-            .title {{ color: #0f2a4a; font-size: 24px; font-weight: bold; margin: 0 0 5px 0; }}
-            .subtitle {{ color: #555; font-size: 15px; margin: 0; }}
-            .section-title {{ color: #0f2a4a; font-size: 16px; font-weight: bold; margin-top: 30px; margin-bottom: 12px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }}
-            .grid-params {{ display: flex; flex-wrap: wrap; gap: 20px 40px; background: #f8fafc; padding: 15px; border-radius: 6px; margin-bottom: 25px; border: 1px solid #e2e8f0; }}
-            .param-item {{ font-size: 13px; }}
-            table {{ width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 13px; }}
-            th, td {{ border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; }}
-            th {{ background-color: #0f2a4a; color: white; font-weight: 600; font-size: 12px; }}
+            body {{ font-family: 'Segoe UI', Arial, sans-serif; margin: 30px; color: #333; line-height: 1.4; }}
+            .header {{ display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #0f2a4a; padding-bottom: 12px; margin-bottom: 20px; }}
+            .logo {{ max-height: 70px; max-width: 200px; object-fit: contain; }}
+            .header-info {{ text-align: right; font-size: 12px; color: #666; margin-bottom: 15px; }}
+            .title {{ color: #0f2a4a; font-size: 22px; font-weight: bold; margin: 0 0 4px 0; }}
+            .subtitle {{ color: #555; font-size: 14px; margin: 0; }}
+            .section-title {{ color: #0f2a4a; font-size: 15px; font-weight: bold; margin-top: 20px; margin-bottom: 10px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }}
+            .grid-params {{ display: flex; flex-wrap: wrap; gap: 15px 30px; background: #f8fafc; padding: 12px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #e2e8f0; }}
+            .param-item {{ font-size: 12px; }}
+            table {{ width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px; }}
+            th, td {{ border: 1px solid #cbd5e1; padding: 8px; text-align: left; }}
+            th {{ background-color: #0f2a4a; color: white; font-weight: 600; font-size: 11px; }}
             tr:nth-child(even) {{ background-color: #f8fafc; }}
-            .footer {{ margin-top: 50px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 15px; }}
+            .footer {{ margin-top: 30px; text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 10px; }}
+            
+            /* Quebra de página forçada para o Rateio */
+            .page-break {{ page-break-before: always; break-before: page; margin-top: 20px; }}
+            
             @media print {{
                 .btn-print {{ display: none; }}
-                body {{ margin: 20px; }}
+                body {{ margin: 15px; }}
             }}
         </style>
     </head>
@@ -964,6 +965,9 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
             </tbody>
         </table>
 
+        <!-- INÍCIO DA PÁGINA 2 -->
+        <div class="page-break"></div>
+        
         <div class="section-title">Detalhamento de Rateio Interno da Guia - {anexo_detalhe} (DAS Tradicional)</div>
         <table style="max-width: 500px;">
             <thead>
