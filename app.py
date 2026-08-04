@@ -835,15 +835,21 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
             st.warning("🔵 **Para Vendas B2B (Empresas):** Apurar por fora transfere **crédito integral de IBS/CBS** para seus clientes PJ, aumentando muito sua competitividade de vendas.")
 
     # --------------------------------------------------------------------------
-    # 5. DETALHAMENTO DO RATEIO
+    # 5. DETALHAMENTO DO RATEIO E IMPRESSÃO COMPLETA
     # --------------------------------------------------------------------------
     st.divider()
     st.subheader("🔀 Detalhamento e Rateio Interno (DAS Tradicional)")
     anexo_detalhe = st.selectbox("Escolha um Anexo para enxergar a divisão da guia do imposto:", list(TABELAS_PADRAO.keys()))
     
+    # Inicializa a variável de impressão com segurança
+    df_rateio_impressao = pd.DataFrame()
+
     if anexo_detalhe in detalhes_impostos:
         dict_impostos = detalhes_impostos[anexo_detalhe]
         df_rateio = pd.DataFrame([{"Imposto": k, "Valor Destinado": v} for k, v in dict_impostos.items() if v > 0])
+        
+        # Alimenta a variável que a impressão vai ler
+        df_rateio_impressao = df_rateio.copy()
         
         col_graf1, col_graf2 = st.columns([1, 1])
         with col_graf1:
@@ -859,9 +865,6 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
     st.divider()
     st.subheader("🖨️ Imprimir Simulação")
     
-   # ==============================================================================
-    # CONSTRUÇÃO DO DOCUMENTO HTML CUSTOMIZADO PARA IMPRESSÃO (REFORMA TRIBUTÁRIA)
-    # ==============================================================================
     html_linhas_tabela = ""
     for r in resultados:
         das_trad = formatar_br(r["DAS Tradicional"]) if isinstance(r["DAS Tradicional"], (int, float)) else r["DAS Tradicional"]
@@ -869,6 +872,9 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
         cbs_v = formatar_br(r["CBS Por Fora"]) if isinstance(r["CBS Por Fora"], (int, float)) else r["CBS Por Fora"]
         ibs_v = formatar_br(r["IBS Por Fora"]) if isinstance(r["IBS Por Fora"], (int, float)) else r["IBS Por Fora"]
         total_v = formatar_br(r["Carga Total (Reforma)"]) if isinstance(r["Carga Total (Reforma)"], (int, float)) else r["Carga Total (Reforma)"]
+        
+        # Cores dinâmicas para a diferença (Vermelho se aumentou, Verde se economizou)
+        cor_dif = "#ef4444" if r["Diferença (R$)"] > 0 else ("#22c55e" if r["Diferença (R$)"] < 0 else "#333")
         dif_v = formatar_br(r["Diferença (R$)"]) if isinstance(r["Diferença (R$)"], (int, float)) else r["Diferença (R$)"]
         
         html_linhas_tabela += f"""
@@ -879,12 +885,12 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
             <td>{cbs_v}</td>
             <td>{ibs_v}</td>
             <td><b>{total_v}</b></td>
-            <td>{dif_v}</td>
+            <td style="color: {cor_dif}; font-weight: bold;">{dif_v}</td>
         </tr>
         """
         
     html_linhas_rateio = ""
-    if 'df_rateio_impressao' in locals() and not df_rateio_impressao.empty:
+    if not df_rateio_impressao.empty:
         for idx, row in df_rateio_impressao.iterrows():
             html_linhas_rateio += f"<tr><td>{row['Imposto']}</td><td>{formatar_br(row['Valor Destinado'])}</td></tr>"
 
@@ -976,7 +982,6 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
         </div>
         
         <script>
-            // Aciona automaticamente a janela de impressão ao abrir o arquivo externo
             window.onload = function() {{ window.print(); }}
         </script>
     </body>
