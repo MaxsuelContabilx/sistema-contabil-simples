@@ -970,6 +970,12 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
         <meta charset="utf-8">
         <title>Simulação Simples Nacional + Reforma Tributária - Maxsuel Contabilidade</title>
         <style>
+            /* FORÇA A IMPRESSÃO DE CORES DE FUNDO E GRÁFICOS */
+            * {{
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }}
+
             body {{ font-family: 'Segoe UI', Arial, sans-serif; margin: 25px; color: #333; line-height: 1.4; }}
             .header {{ display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #0f2a4a; padding-bottom: 10px; margin-bottom: 15px; }}
             .logo {{ max-height: 65px; max-width: 190px; object-fit: contain; }}
@@ -977,20 +983,25 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
             .title {{ color: #0f2a4a; font-size: 20px; font-weight: bold; margin: 0 0 3px 0; }}
             .subtitle {{ color: #555; font-size: 13px; margin: 0; }}
             .section-title {{ color: #0f2a4a; font-size: 14px; font-weight: bold; margin-top: 15px; margin-bottom: 8px; border-bottom: 1px solid #ddd; padding-bottom: 3px; }}
-            .grid-params {{ display: flex; flex-wrap: wrap; gap: 10px 25px; background: #f8fafc; padding: 10px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #e2e8f0; }}
+            .grid-params {{ display: flex; flex-wrap: wrap; gap: 10px 25px; background-color: #f8fafc !important; padding: 10px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #e2e8f0; }}
             .param-item {{ font-size: 11px; }}
+            
             table {{ width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 11px; }}
             th, td {{ border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; }}
-            th {{ background-color: #0f2a4a; color: white; font-weight: 600; font-size: 11px; }}
-            tr:nth-child(even) {{ background-color: #f8fafc; }}
-            .footer {{ margin-top: 25px; text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 8px; }}
+            th {{ background-color: #0f2a4a !important; color: white !important; font-weight: 600; font-size: 11px; }}
+            tr:nth-child(even) {{ background-color: #f8fafc !important; }}
             
+            .footer {{ margin-top: 25px; text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 8px; }}
             .page-break {{ page-break-before: always; break-before: page; }}
             .flex-container {{ display: flex; gap: 20px; align-items: flex-start; margin-top: 10px; }}
             
             @media print {{
                 .btn-print {{ display: none; }}
                 body {{ margin: 15px; }}
+                * {{
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                }}
             }}
         </style>
     </head>
@@ -1058,7 +1069,7 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
                 </table>
             </div>
             
-            <div style="flex: 1; background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0;">
+            <div style="flex: 1; background-color: #f8fafc !important; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0;">
                 <b style="font-size: 12px; color: #0f2a4a; display: block; margin-bottom: 10px;">Distribuição Proporcional dos Impostos</b>
                 {html_barras_grafico}
             </div>
@@ -1074,7 +1085,6 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
     </body>
     </html>
     """
-
     st.info("Clique no botão abaixo para gerar o arquivo de impressão. O relatório virá com a sua logomarca oficial e abrirá a tela de impressão do seu computador automaticamente.")
     st.download_button(
         label="🖨️ Baixar e Imprimir Relatório Fiscal",
