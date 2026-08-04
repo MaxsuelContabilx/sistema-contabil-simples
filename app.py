@@ -863,6 +863,40 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
     st.divider()
     st.subheader("🖨️ Imprimir Simulação")
     
+    # Prepara Diagnóstico Estratégico para o Relatório Impresso
+    res_anexo_imp = resultados[0] if resultados else {}
+    dif_imp = res_anexo_imp.get("Diferença (R$)", 0)
+    
+    if dif_imp > 0:
+        html_diag_b2c = f"""
+        <div style="background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 10px 14px; margin-bottom: 10px; border-radius: 4px;">
+            <b style="color: #991b1b;">🔴 Recomendação Vendas B2C (Consumidor Final):</b><br>
+            <span style="font-size: 12px; color: #7f1d1d;">Mantendo no <b>Simples Tradicional</b> a empresa economiza até <b>{formatar_br(abs(dif_imp))}</b> por mês em relação ao modelo híbrido.</span>
+        </div>
+        """
+    elif dif_imp < 0:
+        html_diag_b2c = f"""
+        <div style="background-color: #f0fdf4; border-left: 4px solid #22c55e; padding: 10px 14px; margin-bottom: 10px; border-radius: 4px;">
+            <b style="color: #166534;">🟢 Recomendação Vendas B2C (Consumidor Final):</b><br>
+            <span style="font-size: 12px; color: #14532d;">Optar por <b>Recolher Por Fora</b> gera <b>{formatar_br(abs(dif_imp))}</b> de economia mensal diretamente no caixa!</span>
+        </div>
+        """
+    else:
+        html_diag_b2c = """
+        <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 10px 14px; margin-bottom: 10px; border-radius: 4px;">
+            <b style="color: #1e40af;">⚖️ Carga Equivalente:</b><br>
+            <span style="font-size: 12px; color: #1e3a8a;">Ambas as opções geram o mesmo valor total de tributação na operação.</span>
+        </div>
+        """
+
+    html_diag_b2b = """
+    <div style="background-color: #f0f9ff; border-left: 4px solid #0284c7; padding: 10px 14px; margin-bottom: 15px; border-radius: 4px;">
+        <b style="color: #075985;">🔵 Posicionamento Estratégico Vendas B2B (Empresas):</b><br>
+        <span style="font-size: 12px; color: #0c4a6e;">Apurar IBS/CBS por fora transfere <b>crédito tributário integral</b> aos clientes PJ, tornando o preço de venda significativamente mais competitivo nas negociações corporativas.</span>
+    </div>
+    """
+
+    # Monta Tabela Comparativa de Resultados
     html_linhas_tabela = ""
     for r in resultados:
         das_trad = formatar_br(r["DAS Tradicional"]) if isinstance(r["DAS Tradicional"], (int, float)) else r["DAS Tradicional"]
@@ -886,10 +920,27 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
         </tr>
         """
         
+    # Monta Tabela e Gráfico HTML de Rateio para a Página 2
     html_linhas_rateio = ""
+    html_barras_grafico = ""
+    
     if not df_rateio_impressao.empty:
+        max_valor = df_rateio_impressao["Valor Destinado"].max() if df_rateio_impressao["Valor Destinado"].max() > 0 else 1
+        
         for idx, row in df_rateio_impressao.iterrows():
-            html_linhas_rateio += f"<tr><td>{row['Imposto']}</td><td>{formatar_br(row['Valor Destinado'])}</td></tr>"
+            v_format = formatar_br(row['Valor Destinado'])
+            pct = (row['Valor Destinado'] / max_valor) * 100
+            
+            html_linhas_rateio += f"<tr><td>{row['Imposto']}</td><td><b>{v_format}</b></td></tr>"
+            
+            html_barras_grafico += f"""
+            <div style="margin-bottom: 8px;">
+                <div style="font-size: 11px; margin-bottom: 2px; color: #475569;"><b>{row['Imposto']}:</b> {v_format}</div>
+                <div style="background-color: #e2e8f0; width: 100%; height: 14px; border-radius: 3px; overflow: hidden;">
+                    <div style="background-color: #0f2a4a; width: {pct:.1f}%; height: 100%;"></div>
+                </div>
+            </div>
+            """
 
     logo_tag = f'<img class="logo" src="data:image/png;base64,{logo_base64}">' if logo_base64 else '<h2 style="color: #0f2a4a; margin:0;">MAXSUEL CONTABILIDADE</h2>'
     data_atual = datetime.now().strftime("%d/%m/%Y às %H:%M")
@@ -901,23 +952,23 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
         <meta charset="utf-8">
         <title>Simulação Simples Nacional + Reforma Tributária - Maxsuel Contabilidade</title>
         <style>
-            body {{ font-family: 'Segoe UI', Arial, sans-serif; margin: 30px; color: #333; line-height: 1.4; }}
-            .header {{ display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #0f2a4a; padding-bottom: 12px; margin-bottom: 20px; }}
-            .logo {{ max-height: 70px; max-width: 200px; object-fit: contain; }}
-            .header-info {{ text-align: right; font-size: 12px; color: #666; margin-bottom: 15px; }}
-            .title {{ color: #0f2a4a; font-size: 22px; font-weight: bold; margin: 0 0 4px 0; }}
-            .subtitle {{ color: #555; font-size: 14px; margin: 0; }}
-            .section-title {{ color: #0f2a4a; font-size: 15px; font-weight: bold; margin-top: 20px; margin-bottom: 10px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }}
-            .grid-params {{ display: flex; flex-wrap: wrap; gap: 15px 30px; background: #f8fafc; padding: 12px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #e2e8f0; }}
-            .param-item {{ font-size: 12px; }}
-            table {{ width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px; }}
-            th, td {{ border: 1px solid #cbd5e1; padding: 8px; text-align: left; }}
+            body {{ font-family: 'Segoe UI', Arial, sans-serif; margin: 25px; color: #333; line-height: 1.4; }}
+            .header {{ display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #0f2a4a; padding-bottom: 10px; margin-bottom: 15px; }}
+            .logo {{ max-height: 65px; max-width: 190px; object-fit: contain; }}
+            .header-info {{ text-align: right; font-size: 11px; color: #666; margin-bottom: 12px; }}
+            .title {{ color: #0f2a4a; font-size: 20px; font-weight: bold; margin: 0 0 3px 0; }}
+            .subtitle {{ color: #555; font-size: 13px; margin: 0; }}
+            .section-title {{ color: #0f2a4a; font-size: 14px; font-weight: bold; margin-top: 15px; margin-bottom: 8px; border-bottom: 1px solid #ddd; padding-bottom: 3px; }}
+            .grid-params {{ display: flex; flex-wrap: wrap; gap: 10px 25px; background: #f8fafc; padding: 10px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #e2e8f0; }}
+            .param-item {{ font-size: 11px; }}
+            table {{ width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 11px; }}
+            th, td {{ border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; }}
             th {{ background-color: #0f2a4a; color: white; font-weight: 600; font-size: 11px; }}
             tr:nth-child(even) {{ background-color: #f8fafc; }}
-            .footer {{ margin-top: 30px; text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 10px; }}
+            .footer {{ margin-top: 25px; text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 8px; }}
             
-            /* Quebra de página forçada para o Rateio */
-            .page-break {{ page-break-before: always; break-before: page; margin-top: 20px; }}
+            .page-break {{ page-break-before: always; break-before: page; }}
+            .flex-container {{ display: flex; gap: 20px; align-items: flex-start; margin-top: 10px; }}
             
             @media print {{
                 .btn-print {{ display: none; }}
@@ -965,21 +1016,35 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
             </tbody>
         </table>
 
+        <div class="section-title">Diagnóstico Estratégico e Parecer Fiscal</div>
+        {html_diag_b2c}
+        {html_diag_b2b}
+
         <!-- INÍCIO DA PÁGINA 2 -->
         <div class="page-break"></div>
         
-        <div class="section-title">Detalhamento de Rateio Interno da Guia - {anexo_detalhe} (DAS Tradicional)</div>
-        <table style="max-width: 500px;">
-            <thead>
-                <tr>
-                    <th>Imposto / Ente Federativo</th>
-                    <th>Valor Destinado</th>
-                </tr>
-            </thead>
-            <tbody>
-                {html_linhas_rateio}
-            </tbody>
-        </table>
+        <div class="section-title" style="margin-top: 20px;">Detalhamento de Rateio Interno da Guia - {anexo_detalhe} (DAS Tradicional)</div>
+        
+        <div class="flex-container">
+            <div style="flex: 1;">
+                <table style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th>Imposto / Ente Federativo</th>
+                            <th>Valor Destinado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {html_linhas_rateio}
+                    </tbody>
+                </table>
+            </div>
+            
+            <div style="flex: 1; background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                <b style="font-size: 12px; color: #0f2a4a; display: block; margin-bottom: 10px;">Distribuição Proporcional dos Impostos</b>
+                {html_barras_grafico}
+            </div>
+        </div>
 
         <div class="footer">
             Hub de Soluções Contábeis Maxsuel © 2026 - Documento gerado eletronicamente para suporte decisório estratégico.
