@@ -685,8 +685,22 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
     # 1. ENTRADAS BÁSICAS DO SIMPLES
     # --------------------------------------------------------------------------
     col_in1, col_in2 = st.columns(2)
-    rbt12 = col_in1.number_input("Receita Acumulada nos últimos 12 meses (RBT12):", min_value=0.00, value=250000.00, format="%0.2f")
-    faturamento_mes = col_in2.number_input("Faturamento Estimado para o Mês Atual:", min_value=0.00, value=20000.00, format="%.2f")
+
+# RBT12 (com formatação PT-BR)
+rbt12_input = col_in1.text_input("Receita Acumulada nos últimos 12 meses (RBT12):", value="250.000,00")
+try:
+    rbt12 = float(rbt12_input.replace(".", "").replace(",", "."))
+except ValueError:
+    st.error("Digite um valor válido para a RBT12 (ex: 250.000,00).")
+    rbt12 = 0.0
+
+# Faturamento do Mês (com formatação PT-BR)
+faturamento_mes_input = col_in2.text_input("Faturamento Estimado para o Mês Atual:", value="20.000,00")
+try:
+    faturamento_mes = float(faturamento_mes_input.replace(".", "").replace(",", "."))
+except ValueError:
+    st.error("Digite um valor válido para o faturamento (ex: 20.000,00).")
+    faturamento_mes = 0.0
     
     # --------------------------------------------------------------------------
     # 2. ENTRADAS DA REFORMA TRIBUTÁRIA (CBS & IBS POR FORA)
