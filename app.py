@@ -684,9 +684,8 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
     # --------------------------------------------------------------------------
     # 1. ENTRADAS BÁSICAS DO SIMPLES
     # --------------------------------------------------------------------------
+    
     col_in1, col_in2 = st.columns(2)
-
- col_in1, col_in2 = st.columns(2)
     rbt12 = col_in1.number_input("Receita Acumulada nos últimos 12 meses (RBT12):", min_value=0.00, value=250000.00, format="%.2f")
     faturamento_mes = col_in2.number_input("Faturamento Estimado para o Mês Atual:", min_value=0.00, value=20000.00, format="%.2f")
     
