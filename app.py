@@ -112,9 +112,12 @@ def gerar_relatorio_html(titulo_modulo, parametros_dict, colunas_tabela, dados_t
         <div class="section-title">💡 Diagnóstico Estratégico e Parecer Fiscal</div>
         <div class="card-diag card-green"><div class="card-title">🔴 Recomendação de Enquadramento:</div>{recomendacao_txt}</div>
         <div class="card-diag card-blue"><div class="card-title">🔵 Observações da Legislação:</div>{obs_txt}</div>
-    </body>
-    </html>
-    """
+    <script>
+        window.onload = function() {{ window.print(); }};
+    </script>
+</body>
+</html>
+"""
 # Configuração da Página
 st.set_page_config(page_title="Maxsuel Contabilidade - Gestão e Estratégia", layout="wide")
 
@@ -1662,22 +1665,22 @@ elif st.session_state.pagina_selecionada == "📊 Planejamento Tributário Compa
     rec = f"O regime do <strong>{vencedor_nome}</strong> apresenta a menor carga tributária total, gerando um desembolso estimado de <strong>{formatar_br(menor_valor)}</strong> por mês."
     obs = f"Cenário apurado sob o <strong>{modelo_tributario}</strong>. Presunções do Lucro Presumido reajustadas em +10% e retenções da Lei nº 15.270 incidentes sobre parcelas de lucros que superam R$ 50.000,00/mês."
 
-    # 3. Geração e Exibição do HTML Único
+   # 3. Geração e Exibição do Link de Impressão Direta
     html_final = gerar_relatorio_html(
         "Relatório Estratégico de Planejamento Tributário Comparativo", 
         params, colunas, dados, mem_presumido, mem_real, rec, obs
     )
 
-    html_com_botao = f"""
-    <div style="text-align: right; margin-bottom: 12px;" class="no-print">
-        <button onclick="window.print()" style="background-color: #0f172a; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 13px;">
-            🖨️ Imprimir / Salvar PDF
-        </button>
-    </div>
-    <style>
-        @media print {{ .no-print {{ display: none !important; }} }}
-    </style>
-    {html_final}
-    """
+    b64 = base64.b64encode(html_final.encode('utf-8')).decode('utf-8')
+    nome_arquivo = f"Simulacao_Planejamento_Tributario_{datetime.now().strftime('%Y%m%d%H%M')}.html"
 
-    st.components.v1.html(html_com_botao, height=850, scrolling=True)
+    st.markdown(
+        f'''
+        <a href="data:text/html;charset=utf-8;base64,{b64}" download="{nome_arquivo}" target="_blank" 
+           style="display: inline-block; background-color: #0f172a; color: white; padding: 12px 24px; 
+                  text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px;">
+            🖨️ Gerar e Imprimir Relatório Executivo
+        </a>
+        ''',
+        unsafe_allow_html=True
+    )
