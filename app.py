@@ -66,10 +66,14 @@ def gerar_relatorio_html(titulo_modulo, parametros_dict, colunas_tabela, dados_t
         .card-blue {{ background-color: #f0f9ff; border-left: 4px solid #0284c7; color: #075985; }}
         .card-title {{ font-weight: bold; font-size: 12px; margin-bottom: 3px; }}
 
-        @media print {{
-            .no-print {{ display: none !important; }}
-            body {{ margin: 0; padding: 0; }}
+       @media print {{
+        .no-print {{ display: none !important; }}
+        body {{ margin: 0; padding: 0; }}
+        * {{
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
         }}
+    }}
     </style>
     </head>
     <body>
