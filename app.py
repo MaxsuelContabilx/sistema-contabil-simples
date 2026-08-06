@@ -77,64 +77,90 @@ def formatar_br(valor):
     except:
         return "R$ 0,00"
 # ==============================================================================
-# FUNÇÕES DE CÁLCULO: LUCRO PRESUMIDO E LUCRO REAL
+# FUNÇÕES DE CÁLCULO ATUALIZADAS (TRANSPARÊNCIA TOTAL + IRRF DISTRIBUIÇÃO)
 # ==============================================================================
-def calcular_lucro_presumido(faturamento_mes, atividade, folha_mes=0.0):
-    if atividade == "Comércio / Indústria":
-        presuncao_irpj, presuncao_csll = 0.08, 0.12
-    else:
-        presuncao_irpj, presuncao_csll = 0.32, 0.32
+def calcular_lucro_presumido(faturamento_mes, atividade, folha_mes=0.0, distribuicao_lucro=0.0, icms_iss_est=0.05):
+    # 1. Presunções para Renda
+    p_irpj = 0.08 if atividade == "Comércio / Indústria" else 0.32
+    p_csll = 0.12 if atividade == "Comércio / Indústria" else 0.32
 
-    base_irpj = faturamento_mes * presuncao_irpj
-    base_csll = faturamento_mes * presuncao_csll
+    base_irpj = faturamento_mes * p_irpj
+    base_csll = faturamento_mes * p_csll
 
+    # 2. Tributos sobre Renda (IRPJ + CSLL)
     irpj_base = base_irpj * 0.15
-    irpj_adicional = max(0.0, (base_irpj - 20000.0) * 0.10)
-    irpj_total = irpj_base + irpj_adicional
-
+    irpj_adic = max(0.0, (base_irpj - 20000.0) * 0.10)
+    irpj_total = irpj_base + irpj_adic
     csll_total = base_csll * 0.09
+
+    # 3. Tributos sobre Faturamento (PIS, COFINS, ICMS/ISS)
     pis_total = faturamento_mes * 0.0065
     cofins_total = faturamento_mes * 0.03
-    inss_patronal = folha_mes * 0.278
+    est_icms_iss = faturamento_mes * icms_iss_est  # Estimativa ICMS/ISS estadual/municipal
 
-    total_tributos = irpj_total + csll_total + pis_total + cofins_total + inss_patronal
+    # 4. Tributos sobre Folha e Lucros
+    inss_patronal = folha_mes * 0.278
+    # IRRF sobre Distribuição de Lucros (Exemplo: 10% para parcelas que excedem R$ 50.000)
+    irrf_distribuicao = max(0.0, (distribuicao_lucro - 50000.0) * 0.10) if distribuicao_lucro > 50000.0 else 0.0
+
+    tot_renda = irpj_total + csll_total
+    tot_faturamento = pis_total + cofins_total + est_icms_iss
+    tot_geral = tot_renda + tot_faturamento + inss_patronal + irrf_distribuicao
+
     return {
         "Regime": "Lucro Presumido",
+        "Base IRPJ/CSLL": f"{p_irpj*100:.0f}% / {p_csll*100:.0f}%",
         "IRPJ": irpj_total,
         "CSLL": csll_total,
+        "Subtotal Renda": tot_renda,
         "PIS/COFINS": pis_total + cofins_total,
+        "ICMS/ISS Est.": est_icms_iss,
+        "Subtotal Faturamento": tot_faturamento,
         "INSS Patronal": inss_patronal,
-        "Total Tributos": total_tributos,
-        "Aliquota Efetiva": (total_tributos / faturamento_mes * 100) if faturamento_mes > 0 else 0
+        "IRRF Lucros (>50k)": irrf_distribuicao,
+        "Total Tributos": tot_geral,
+        "Aliquota Efetiva": (tot_geral / faturamento_mes * 100) if faturamento_mes > 0 else 0
     }
 
-def calcular_lucro_real(faturamento_mes, despesas_operacionais, insumos_credito, folha_mes=0.0):
+def calcular_lucro_real(faturamento_mes, despesas_op, insumos_cred, folha_mes=0.0, distribuicao_lucro=0.0, icms_iss_est=0.05):
+    # 1. Tributos sobre Faturamento (PIS/COFINS Não-Cumulativo + ICMS/ISS)
     debito_pis_cofins = faturamento_mes * 0.0925
-    credito_pis_cofins = insumos_credito * 0.0925
+    credito_pis_cofins = insumos_cred * 0.0925
     pis_cofins_liquido = max(0.0, debito_pis_cofins - credito_pis_cofins)
+    est_icms_iss = faturamento_mes * icms_iss_est
 
-    lucro_operacional = faturamento_mes - despesas_operacionais - pis_cofins_liquido
+    # 2. Base de Renda (Lucro Líquido Real)
+    lucro_operacional = faturamento_mes - despesas_op - pis_cofins_liquido - est_icms_iss
 
     if lucro_operacional > 0:
         irpj_base = lucro_operacional * 0.15
-        irpj_adicional = max(0.0, (lucro_operacional - 20000.0) * 0.10)
-        irpj_total = irpj_base + irpj_adicional
+        irpj_adic = max(0.0, (lucro_operacional - 20000.0) * 0.10)
+        irpj_total = irpj_base + irpj_adic
         csll_total = lucro_operacional * 0.09
     else:
-        irpj_total = 0.0
-        csll_total = 0.0
+        irpj_total, csll_total = 0.0, 0.0
 
+    # 3. Folha e Lucros
     inss_patronal = folha_mes * 0.278
-    total_tributos = irpj_total + csll_total + pis_cofins_liquido + inss_patronal
+    irrf_distribuicao = max(0.0, (distribuicao_lucro - 50000.0) * 0.10) if distribuicao_lucro > 50000.0 else 0.0
+
+    tot_renda = irpj_total + csll_total
+    tot_faturamento = pis_cofins_liquido + est_icms_iss
+    tot_geral = tot_renda + tot_faturamento + inss_patronal + irrf_distribuicao
 
     return {
         "Regime": "Lucro Real",
+        "Base IRPJ/CSLL": f"Lucro Real (R$ {max(0.0, lucro_operacional):,.2f})",
         "IRPJ": irpj_total,
         "CSLL": csll_total,
+        "Subtotal Renda": tot_renda,
         "PIS/COFINS": pis_cofins_liquido,
+        "ICMS/ISS Est.": est_icms_iss,
+        "Subtotal Faturamento": tot_faturamento,
         "INSS Patronal": inss_patronal,
-        "Total Tributos": total_tributos,
-        "Aliquota Efetiva": (total_tributos / faturamento_mes * 100) if faturamento_mes > 0 else 0
+        "IRRF Lucros (>50k)": irrf_distribuicao,
+        "Total Tributos": tot_geral,
+        "Aliquota Efetiva": (tot_geral / faturamento_mes * 100) if faturamento_mes > 0 else 0
     }
 # --- FUNÇÃO PARA CONVERTER IMAGEM LOCAL PARA BASE64 ---
 def obter_logo_base64(caminho_img):
@@ -1316,28 +1342,28 @@ elif st.session_state.pagina_selecionada == "📋 Módulo de Folha & Fator R":
             col_c2.metric("Alíquota Efetiva de INSS", f"{(inss_desconto / salario_sujeito_encargos * 100) if salario_sujeito_encargos > 0 else 0:.2f}%")
             col_c3.metric("IRRF Retido Final", formatar_br(irrf_final))
 # ==============================================================================
-# TELA 5: PLANEJAMENTO TRIBUTÁRIO COMPARATIVO TRÍPLICE
+# TELA 5: PLANEJAMENTO TRIBUTÁRIO COMPARATIVO TRÍPLICE (TRANSPARÊNCIA EXPANDIDA)
 # ==============================================================================
 elif st.session_state.pagina_selecionada == "📊 Planejamento Tributário Comparativo":
     st.title("📊 Planejamento Tributário Comparativo (Simples x Presumido x Real)")
-    st.markdown("Simule a carga tributária total nos três regimes para tomar a melhor decisão fiscal.")
+    st.markdown("Análise detalhada segregando impostos sobre Faturamento, Renda, Folha e Distribuição de Lucros.")
 
-    st.subheader("📥 Dados Operacionais da Empresa")
+    st.subheader("📥 Parâmetros Financeiros e Operacionais")
     col_i1, col_i2, col_i3 = st.columns(3)
-    
     fat_mes = col_i1.number_input("Faturamento Estimado do Mês (R$):", min_value=0.0, value=50000.0, step=5000.0)
     rbt12_comp = col_i2.number_input("RBT12 (Simples Nacional - R$):", min_value=0.0, value=600000.0, step=10000.0)
-    atividade = col_i3.selectbox("Atividade Principal:", ["Serviços em Geral", "Comércio / Indústria"])
+    atividade = col_i3.selectbox("Atividade Principal:", ["Comércio / Indústria", "Serviços em Geral"])
 
     col_i4, col_i5, col_i6 = st.columns(3)
-    despesas_op = col_i4.number_input("Despesas Operacionais Totais (Mês):", min_value=0.0, value=20000.0, step=2000.0)
-    insumos_cred = col_i5.number_input("Compras / Insumos c/ Crédito PIS/COFINS:", min_value=0.0, value=10000.0, step=1000.0)
-    folha_comp = col_i6.number_input("Folha de Pagamento / Pró-Labore Mensal:", min_value=0.0, value=8000.0, step=1000.0)
+    despesas_op = col_i4.number_input("Despesas Operacionais (Mês):", min_value=0.0, value=20000.0, step=2000.0)
+    insumos_cred = col_i5.number_input("Compras c/ Crédito PIS/COFINS:", min_value=0.0, value=10000.0, step=1000.0)
+    folha_comp = col_i6.number_input("Folha / Pró-Labore (Mês):", min_value=0.0, value=8000.0, step=1000.0)
 
-    anexo_simples = st.selectbox("Anexo de Enquadramento no Simples Nacional:", list(TABELAS_PADRAO.keys()))
+    col_i7, col_i8 = st.columns(2)
+    anexo_simples = col_i7.selectbox("Anexo no Simples Nacional:", list(TABELAS_PADRAO.keys()))
+    distribuicao_lucro = col_i8.number_input("Distribuição de Lucros Projetada (Mês):", min_value=0.0, value=0.0, step=5000.0, help="Valores acima de R$ 50.000 sofrem retenção de 10% de IRRF.")
 
     # --- CÁLCULOS ---
-    # 1. Simples Nacional
     faixas = TABELAS_PADRAO[anexo_simples]
     aliq_nom, deducao = 0.0, 0.0
     for limite, aliq, ded in faixas:
@@ -1347,48 +1373,84 @@ elif st.session_state.pagina_selecionada == "📊 Planejamento Tributário Compa
     
     aliq_efetiva_simples = max(0.0, ((rbt12_comp * aliq_nom) - deducao) / rbt12_comp) if rbt12_comp > 0 else aliq_nom
     imposto_simples = fat_mes * aliq_efetiva_simples
+    inss_simples = (folha_comp * 0.20) if "Anexo IV" in anexo_simples else 0.0
+    irrf_lucros_simples = max(0.0, (distribuicao_lucro - 50000.0) * 0.10) if distribuicao_lucro > 50000.0 else 0.0
+    total_simples = imposto_simples + inss_simples + irrf_lucros_simples
 
-    res_simples = {
-        "Regime": "Simples Nacional",
-        "Tributo Operacional": imposto_simples,
-        "INSS Patronal": 0.0 if "Anexo IV" not in anexo_simples else (folha_comp * 0.20),
-        "Total Tributos": imposto_simples if "Anexo IV" not in anexo_simples else (imposto_simples + (folha_comp * 0.20)),
-        "Aliquota Efetiva": (imposto_simples / fat_mes * 100) if fat_mes > 0 else 0
-    }
+    res_presumido = calcular_lucro_presumido(fat_mes, atividade, folha_comp, distribuicao_lucro)
+    res_real = calcular_lucro_real(fat_mes, despesas_op, insumos_cred, folha_comp, distribuicao_lucro)
 
-    # 2. Lucro Presumido
-    res_presumido = calcular_lucro_presumido(fat_mes, atividade, folha_comp)
-
-    # 3. Lucro Real
-    res_real = calcular_lucro_real(fat_mes, despesas_op, insumos_cred, folha_comp)
-
-    # --- TABELA COMPARATIVA ---
+    # --- TELA: PAINEL DE SÍNTESE ---
     st.divider()
-    st.subheader("⚖️ Painel Comparativo de Carga Tributária")
+    st.subheader("⚖️ Resumo Consolidado de Carga Tributária")
 
-    df_comparativo = pd.DataFrame([
+    df_resumo = pd.DataFrame([
         {
-            "Regime Tributário": res_simples["Regime"],
-            "Carga Tributária Total": formatar_br(res_simples["Total Tributos"]),
-            "Alíquota Efetiva Total": f"{res_simples['Aliquota Efetiva']:.2f}%",
-            "INSS Patronal Extra": formatar_br(res_simples["INSS Patronal"])
+            "Regime": "Simples Nacional",
+            "Tributos s/ Faturamento": formatar_br(imposto_simples),
+            "Tributos s/ Renda (IR/CS)": "Incluso no DAS",
+            "INSS Patronal": formatar_br(inss_simples),
+            "IRRF Lucros (>50k)": formatar_br(irrf_lucros_simples),
+            "Carga Total": formatar_br(total_simples),
+            "Alíquota Efetiva": f"{(total_simples/fat_mes*100) if fat_mes > 0 else 0:.2f}%"
         },
         {
-            "Regime Tributário": res_presumido["Regime"],
-            "Carga Tributária Total": formatar_br(res_presumido["Total Tributos"]),
-            "Alíquota Efetiva Total": f"{res_presumido['Aliquota Efetiva']:.2f}%",
-            "INSS Patronal Extra": formatar_br(res_presumido["INSS Patronal"])
+            "Regime": "Lucro Presumido",
+            "Tributos s/ Faturamento": formatar_br(res_presumido["Subtotal Faturamento"]),
+            "Tributos s/ Renda (IR/CS)": formatar_br(res_presumido["Subtotal Renda"]),
+            "INSS Patronal": formatar_br(res_presumido["INSS Patronal"]),
+            "IRRF Lucros (>50k)": formatar_br(res_presumido["IRRF Lucros (>50k)"]),
+            "Carga Total": formatar_br(res_presumido["Total Tributos"]),
+            "Alíquota Efetiva": f"{res_presumido['Aliquota Efetiva']:.2f}%"
         },
         {
-            "Regime Tributário": res_real["Regime"],
-            "Carga Tributária Total": formatar_br(res_real["Total Tributos"]),
-            "Alíquota Efetiva Total": f"{res_real['Aliquota Efetiva']:.2f}%",
-            "INSS Patronal Extra": formatar_br(res_real["INSS Patronal"])
+            "Regime": "Lucro Real",
+            "Tributos s/ Faturamento": formatar_br(res_real["Subtotal Faturamento"]),
+            "Tributos s/ Renda (IR/CS)": formatar_br(res_real["Subtotal Renda"]),
+            "INSS Patronal": formatar_br(res_real["INSS Patronal"]),
+            "IRRF Lucros (>50k)": formatar_br(res_real["IRRF Lucros (>50k)"]),
+            "Carga Total": formatar_br(res_real["Total Tributos"]),
+            "Alíquota Efetiva": f"{res_real['Aliquota Efetiva']:.2f}%"
         }
     ])
+    st.table(df_resumo)
 
-    st.table(df_comparativo)
+    # --- EXPANDERS DE TRANSPARÊNCIA DETALHADA ---
+    st.subheader("🔍 Detalhamento das Bases e Composição de Apuração")
 
-    # Destaque do Menor Imposto
-    menor_regime = min([res_simples, res_presumido, res_real], key=lambda x: x["Total Tributos"])
-    st.success(f"🏆 **Cenário Mais Vantajoso:** O **{menor_regime['Regime']}** apresenta a menor carga fiscal total de **{formatar_br(menor_regime['Total Tributos'])}** ({menor_regime['Aliquota Efetiva']:.2f}% efetivos).")
+    with st.expander("📌 Ver Memória de Cálculo - Lucro Presumido", expanded=False):
+        col_p1, col_p2 = st.columns(2)
+        with col_p1:
+            st.markdown("**Tributação sobre a Renda (IRPJ e CSLL):**")
+            st.write(f"- Presunção Aplicada: `{res_presumido['Base IRPJ/CSLL']}`")
+            st.write(f"- IRPJ (15% + Adicional 10%): **{formatar_br(res_presumido['IRPJ'])}**")
+            st.write(f"- CSLL (9%): **{formatar_br(res_presumido['CSLL'])}**")
+        with col_p2:
+            st.markdown("**Tributação sobre o Faturamento (PIS, COFINS, ICMS/ISS):**")
+            st.write(f"- PIS (0,65%) + COFINS (3,00%): **{formatar_br(res_presumido['PIS/COFINS'])}**")
+            st.write(f"- Est. ICMS/ISS (5% medio): **{formatar_br(res_presumido['ICMS/ISS Est.'])}**")
+            st.write(f"- INSS Patronal (27,8% s/ folha): **{formatar_br(res_presumido['INSS Patronal'])}**")
+
+    with st.expander("📌 Ver Memória de Cálculo - Lucro Real", expanded=False):
+        col_r1, col_r2 = st.columns(2)
+        with col_r1:
+            st.markdown("**Tributação sobre a Renda (IRPJ e CSLL):**")
+            st.write(f"- Base do Lucro Real: `{res_real['Base IRPJ/CSLL']}`")
+            st.write(f"- IRPJ (15% + Adicional 10%): **{formatar_br(res_real['IRPJ'])}**")
+            st.write(f"- CSLL (9%): **{formatar_br(res_real['CSLL'])}**")
+        with col_r2:
+            st.markdown("**Tributação sobre o Faturamento (Não-Cumulativo):**")
+            st.write(f"- PIS/COFINS Líquido (9,25% - Créditos): **{formatar_br(res_real['PIS/COFINS'])}**")
+            st.write(f"- Est. ICMS/ISS (5% médio): **{formatar_br(res_real['ICMS/ISS Est.'])}**")
+            st.write(f"- INSS Patronal (27,8% s/ folha): **{formatar_br(res_real['INSS Patronal'])}**")
+
+    # Destaque Final
+    menor_valor = min([total_simples, res_presumido["Total Tributos"], res_real["Total Tributos"]])
+    if menor_valor == total_simples:
+        vencedor = "Simples Nacional"
+    elif menor_valor == res_presumido["Total Tributos"]:
+        vencedor = "Lucro Presumido"
+    else:
+        vencedor = "Lucro Real"
+
+    st.success(f"🏆 **Cenário Mais Vantajoso:** O **{vencedor}** apresenta a menor carga fiscal global de **{formatar_br(menor_valor)}**.")
