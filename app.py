@@ -5,6 +5,82 @@ import base64
 import sqlite3
 from datetime import datetime
 
+# ==============================================================================
+# FUNÇÃO REUTILIZÁVEL DE IMPRESSÃO (COLOQUE LOGO APÓS OS IMPORTS)
+# ==============================================================================
+def gerar_relatorio_html(titulo_modulo, parametros_dict, colunas_tabela, dados_tabela, recomendacao_txt, obs_txt):
+    import datetime
+    data_emissao = datetime.now().strftime("%d/%m/%Y às %H:%M")
+    
+    linhas_html = ""
+    for linha in dados_tabela:
+        linhas_html += "<tr>"
+        for idx, valor in enumerate(linha):
+            cls = "class='highlight-col'" if idx in [0, len(linha)-2] else ""
+            linhas_html += f"<td {cls}>{valor}</td>"
+        linhas_html += "</tr>"
+
+    params_html = "".join([f"<div><span class='param-item'>{k}:</span> <span class='param-value'>{v}</span></div>" for k, v in parametros_dict.items()])
+
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <meta charset="utf-8">
+    <style>
+        body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; margin: 20px; }}
+        .header-table {{ width: 100%; border-collapse: collapse; margin-bottom: 5px; }}
+        .header-title {{ font-size: 22px; font-weight: bold; color: #0f172a; margin: 0; }}
+        .header-subtitle {{ font-size: 13px; color: #475569; margin-top: 4px; }}
+        .divider {{ border-top: 2px solid #0f172a; margin: 10px 0 15px 0; }}
+        .meta-info {{ font-size: 11px; color: #64748b; text-align: right; margin-bottom: 20px; }}
+        .section-title {{ font-size: 14px; font-weight: bold; color: #0f172a; margin-top: 20px; margin-bottom: 10px; }}
+        .params-box {{ background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; font-size: 12px; margin-bottom: 20px; }}
+        .params-grid {{ display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; }}
+        .param-item {{ font-weight: 600; color: #334155; }}
+        .param-value {{ font-weight: 400; color: #64748b; }}
+        .report-table {{ width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }}
+        .report-table th {{ background-color: #0f172a; color: #ffffff; padding: 10px; text-align: left; font-weight: 600; }}
+        .report-table td {{ padding: 9px 10px; border-bottom: 1px solid #e2e8f0; }}
+        .report-table tr:nth-child(even) {{ background-color: #f8fafc; }}
+        .highlight-col {{ font-weight: bold; color: #0f172a; }}
+        .card-diag {{ border-radius: 6px; padding: 12px; margin-top: 12px; font-size: 12px; }}
+        .card-green {{ background-color: #f0fdf4; border-left: 4px solid #16a34a; color: #166534; }}
+        .card-blue {{ background-color: #f0f9ff; border-left: 4px solid #0284c7; color: #075985; }}
+        .card-title {{ font-weight: bold; font-size: 13px; margin-bottom: 4px; }}
+    </style>
+    </head>
+    <body>
+        <table class="header-table">
+            <tr>
+                <td>
+                    <div class="header-title">Maxsuel Contabilidade</div>
+                    <div class="header-subtitle">{titulo_modulo}</div>
+                </td>
+                <td style="text-align: right; vertical-align: middle;">
+                    <strong style="font-size: 18px; color: #0f172a;">M$</strong><br>
+                    <span style="font-size: 9px; color: #64748b; letter-spacing: 1px;">MAXSUEL</span>
+                </td>
+            </tr>
+        </table>
+        <div class="divider"></div>
+        <div class="meta-info">Emitido em: {data_emissao}</div>
+
+        <div class="section-title">Parâmetros de Entrada Aplicados</div>
+        <div class="params-box"><div class="params-grid">{params_html}</div></div>
+
+        <div class="section-title">Painel Comparativo de Cenários</div>
+        <table class="report-table">
+            <thead><tr>{''.join([f'<th>{col}</th>' for col in colunas_tabela])}</tr></thead>
+            <tbody>{linhas_html}</tbody>
+        </table>
+
+        <div class="section-title">Diagnóstico Estratégico e Parecer Fiscal</div>
+        <div class="card-diag card-green"><div class="card-title">🔴 Recomendação:</div>{recomendacao_txt}</div>
+        <div class="card-diag card-blue"><div class="card-title">🔵 Observações:</div>{obs_txt}</div>
+    </body>
+    </html>
+    """
 # Configuração da Página
 st.set_page_config(page_title="Maxsuel Contabilidade - Gestão e Estratégia", layout="wide")
 
@@ -1495,3 +1571,35 @@ elif st.session_state.pagina_selecionada == "📊 Planejamento Tributário Compa
         vencedor = "Lucro Real"
 
     st.success(f"🏆 **Cenário Mais Vantajoso:** O **{vencedor}** apresenta a menor carga fiscal global de **{formatar_br(menor_valor)}**.")
+# ==============================================================================
+# FINAL DA TELA 5: MONTAGEM E IMPRESSÃO DO RELATÓRIO EXECUTIVO
+# ==============================================================================
+    params = {
+        "Faturamento Mensal": formatar_br(fat_mes),
+        "RBT12": formatar_br(rbt12_comp),
+        "Despesas Op.": formatar_br(despesas_op),
+        "Insumos c/ Crédito": formatar_br(insumos_cred),
+        "Folha/Pró-Labore": formatar_br(folha_comp)
+    }
+
+    lbl_faturam = "Impostos s/ Venda (PIS/COFINS/ICMS)" if "Atual" in modelo_tributario else "Impostos s/ Venda (CBS/IBS)"
+    colunas = ["Regime Tributário", lbl_faturam, "Tributos s/ Renda", "INSS Patronal", "IRRF Lucros (>50k)", "Carga Total (R$)", "Alíquota Efetiva"]
+
+    dados = [
+        ["Simples Nacional", formatar_br(imposto_simples), "Incluso no DAS", formatar_br(inss_simples), formatar_br(irrf_lucros_simples), formatar_br(total_simples), f"{(total_simples/fat_mes*100) if fat_mes > 0 else 0:.2f}%"],
+        ["Lucro Presumido", formatar_br(res_presumido["Subtotal Faturamento"]), formatar_br(res_presumido["Subtotal Renda"]), formatar_br(res_presumido["INSS Patronal"]), formatar_br(res_presumido["IRRF Lucros (>50k)"]), formatar_br(res_presumido["Total Tributos"]), f"{res_presumido['Aliquota Efetiva']:.2f}%"],
+        ["Lucro Real", formatar_br(res_real["Subtotal Faturamento"]), formatar_br(res_real["Subtotal Renda"]), formatar_br(res_real["INSS Patronal"]), formatar_br(res_real["IRRF Lucros (>50k)"]), formatar_br(res_real["Total Tributos"]), f"{res_real['Aliquota Efetiva']:.2f}%"]
+    ]
+
+    rec = f"O regime do <strong>{vencedor_nome}</strong> apresenta a menor carga tributária total, gerando um desembolso estimado de <strong>{formatar_br(menor_valor)}</strong> por mês."
+    obs = f"Modelo aplicado: {modelo_tributario}. Os cálculos do Presumido/Real consideram as presunções atualizadas (+10%) e retenções da Lei nº 15.270 para distribuições de lucro acima de R$ 50.000,00."
+
+    # Gera o relatório com a marca da Maxsuel Contabilidade
+    html_final = gerar_relatorio_html("Relatório de Planejamento Tributário Comparativo", params, colunas, dados, rec, obs)
+
+    # Exibe na tela do Streamlit
+    st.components.v1.html(html_final, height=520, scrolling=True)
+
+    # Botão para disparar a janela de impressão/PDF
+    if st.button("🖨️ Imprimir / Salvar PDF"):
+        st.components.v1.html(f"<script>{html_final} window.print();</script>", height=0)
