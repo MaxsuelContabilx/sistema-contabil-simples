@@ -111,7 +111,7 @@ def gerar_relatorio_html(titulo_modulo, parametros_dict, colunas_tabela, dados_t
 
         <div class="section-title">💡 Diagnóstico Estratégico e Parecer Fiscal</div>
         <div class="card-diag card-green"><div class="card-title">🔴 Recomendação de Enquadramento:</div>{recomendacao_txt}</div>
-       <div class="card-diag card-blue"><div class="card-title">🔵 Observações da Legislação:</div>{obs_txt}</div>
+        <div class="card-diag card-blue"><div class="card-title">🔵 Observações da Legislação:</div>{obs_txt}</div>
         <style>
             @media print {
                 * {
