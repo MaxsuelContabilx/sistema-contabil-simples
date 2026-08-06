@@ -5,12 +5,10 @@ import base64
 import sqlite3
 from datetime import datetime
 
-# ==============================================================================
-# FUNÇÃO REUTILIZÁVEL DE IMPRESSÃO (COLOQUE LOGO APÓS OS IMPORTS)
-# ==============================================================================
-def gerar_relatorio_html(titulo_modulo, parametros_dict, colunas_tabela, dados_tabela, recomendacao_txt, obs_txt):
+def gerar_relatorio_html(titulo_modulo, parametros_dict, colunas_tabela, dados_tabela, mem_presumido, mem_real, recomendacao_txt, obs_txt):
     data_emissao = datetime.now().strftime("%d/%m/%Y às %H:%M")
     
+    # Linhas da tabela comparativa
     linhas_html = ""
     for linha in dados_tabela:
         linhas_html += "<tr>"
@@ -19,7 +17,14 @@ def gerar_relatorio_html(titulo_modulo, parametros_dict, colunas_tabela, dados_t
             linhas_html += f"<td {cls}>{valor}</td>"
         linhas_html += "</tr>"
 
+    # Parâmetros em grid
     params_html = "".join([f"<div><span class='param-item'>{k}:</span> <span class='param-value'>{v}</span></div>" for k, v in parametros_dict.items()])
+
+    # Detalhamento Memória de Cálculo (Presumido)
+    detalhe_presumido_html = "".join([f"<li><strong>{k}:</strong> {v}</li>" for k, v in mem_presumido.items()])
+    
+    # Detalhamento Memória de Cálculo (Real)
+    detalhe_real_html = "".join([f"<li><strong>{k}:</strong> {v}</li>" for k, v in mem_real.items()])
 
     return f"""
     <!DOCTYPE html>
@@ -27,26 +32,44 @@ def gerar_relatorio_html(titulo_modulo, parametros_dict, colunas_tabela, dados_t
     <head>
     <meta charset="utf-8">
     <style>
-        body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; margin: 20px; }}
+        body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; margin: 15px; background-color: #ffffff; }}
         .header-table {{ width: 100%; border-collapse: collapse; margin-bottom: 5px; }}
-        .header-title {{ font-size: 22px; font-weight: bold; color: #0f172a; margin: 0; }}
-        .header-subtitle {{ font-size: 13px; color: #475569; margin-top: 4px; }}
-        .divider {{ border-top: 2px solid #0f172a; margin: 10px 0 15px 0; }}
-        .meta-info {{ font-size: 11px; color: #64748b; text-align: right; margin-bottom: 20px; }}
-        .section-title {{ font-size: 14px; font-weight: bold; color: #0f172a; margin-top: 20px; margin-bottom: 10px; }}
-        .params-box {{ background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; font-size: 12px; margin-bottom: 20px; }}
-        .params-grid {{ display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; }}
+        .header-title {{ font-size: 20px; font-weight: bold; color: #0f172a; margin: 0; }}
+        .header-subtitle {{ font-size: 12px; color: #475569; margin-top: 3px; }}
+        .divider {{ border-top: 2px solid #0f172a; margin: 8px 0 12px 0; }}
+        .meta-info {{ font-size: 11px; color: #64748b; text-align: right; margin-bottom: 15px; }}
+        .section-title {{ font-size: 13px; font-weight: bold; color: #0f172a; margin-top: 15px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }}
+        
+        /* Parâmetros */
+        .params-box {{ background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; font-size: 11px; margin-bottom: 15px; }}
+        .params-grid {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }}
         .param-item {{ font-weight: 600; color: #334155; }}
         .param-value {{ font-weight: 400; color: #64748b; }}
-        .report-table {{ width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }}
-        .report-table th {{ background-color: #0f172a; color: #ffffff; padding: 10px; text-align: left; font-weight: 600; }}
-        .report-table td {{ padding: 9px 10px; border-bottom: 1px solid #e2e8f0; }}
+        
+        /* Tabelas */
+        .report-table {{ width: 100%; border-collapse: collapse; margin-top: 5px; font-size: 11px; }}
+        .report-table th {{ background-color: #0f172a; color: #ffffff; padding: 8px; text-align: left; font-weight: 600; }}
+        .report-table td {{ padding: 7px 8px; border-bottom: 1px solid #e2e8f0; }}
         .report-table tr:nth-child(even) {{ background-color: #f8fafc; }}
         .highlight-col {{ font-weight: bold; color: #0f172a; }}
-        .card-diag {{ border-radius: 6px; padding: 12px; margin-top: 12px; font-size: 12px; }}
+
+        /* Bloco da Memória de Cálculo (2 Colunas) */
+        .memory-container {{ display: flex; gap: 12px; margin-top: 5px; }}
+        .memory-card {{ flex: 1; background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px; font-size: 11px; }}
+        .memory-card-title {{ font-weight: bold; color: #0f172a; font-size: 12px; margin-bottom: 6px; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; }}
+        .memory-card ul {{ margin: 0; padding-left: 15px; color: #334155; }}
+        .memory-card li {{ margin-bottom: 4px; }}
+
+        /* Diagnósticos */
+        .card-diag {{ border-radius: 6px; padding: 10px; margin-top: 10px; font-size: 11px; }}
         .card-green {{ background-color: #f0fdf4; border-left: 4px solid #16a34a; color: #166534; }}
         .card-blue {{ background-color: #f0f9ff; border-left: 4px solid #0284c7; color: #075985; }}
-        .card-title {{ font-weight: bold; font-size: 13px; margin-bottom: 4px; }}
+        .card-title {{ font-weight: bold; font-size: 12px; margin-bottom: 3px; }}
+
+        @media print {{
+            .no-print {{ display: none !important; }}
+            body {{ margin: 0; padding: 0; }}
+        }}
     </style>
     </head>
     <body>
@@ -65,18 +88,30 @@ def gerar_relatorio_html(titulo_modulo, parametros_dict, colunas_tabela, dados_t
         <div class="divider"></div>
         <div class="meta-info">Emitido em: {data_emissao}</div>
 
-        <div class="section-title">Parâmetros de Entrada Aplicados</div>
+        <div class="section-title">📌 Parâmetros Operacionais e Financeiros</div>
         <div class="params-box"><div class="params-grid">{params_html}</div></div>
 
-        <div class="section-title">Painel Comparativo de Cenários</div>
+        <div class="section-title">📊 Resumo Consolidado de Carga Tributária</div>
         <table class="report-table">
             <thead><tr>{''.join([f'<th>{col}</th>' for col in colunas_tabela])}</tr></thead>
             <tbody>{linhas_html}</tbody>
         </table>
 
-        <div class="section-title">Diagnóstico Estratégico e Parecer Fiscal</div>
-        <div class="card-diag card-green"><div class="card-title">🔴 Recomendação:</div>{recomendacao_txt}</div>
-        <div class="card-diag card-blue"><div class="card-title">🔵 Observações:</div>{obs_txt}</div>
+        <div class="section-title">🔍 Detalhamento das Bases e Memória de Apuração</div>
+        <div class="memory-container">
+            <div class="memory-card">
+                <div class="memory-card-title">Lucro Presumido</div>
+                <ul>{detalhe_presumido_html}</ul>
+            </div>
+            <div class="memory-card">
+                <div class="memory-card-title">Lucro Real</div>
+                <ul>{detalhe_real_html}</ul>
+            </div>
+        </div>
+
+        <div class="section-title">💡 Diagnóstico Estratégico e Parecer Fiscal</div>
+        <div class="card-diag card-green"><div class="card-title">🔴 Recomendação de Enquadramento:</div>{recomendacao_txt}</div>
+        <div class="card-diag card-blue"><div class="card-title">🔵 Observações da Legislação:</div>{obs_txt}</div>
     </body>
     </html>
     """
@@ -1570,10 +1605,10 @@ elif st.session_state.pagina_selecionada == "📊 Planejamento Tributário Compa
         vencedor = "Lucro Real"
 
     st.success(f"🏆 **Cenário Mais Vantajoso:** O **{vencedor}** apresenta a menor carga fiscal global de **{formatar_br(menor_valor)}**.")
+    
 # ==============================================================================
-# FINAL DA TELA 5: MONTAGEM E IMPRESSÃO DO RELATÓRIO EXECUTIVO
+# FINAL DA TELA 5: MONTAGEM E IMPRESSÃO INTEGRAIS DO RELATÓRIO EXECUTIVO
 # ==============================================================================
-    # 1. Apuração do Vencedor e Menor Carga
     menor_valor = min([total_simples, res_presumido["Total Tributos"], res_real["Total Tributos"]])
     
     if menor_valor == total_simples:
@@ -1583,13 +1618,17 @@ elif st.session_state.pagina_selecionada == "📊 Planejamento Tributário Compa
     else:
         vencedor_nome = "Lucro Real"
 
-    # 2. Dicionários e Listas do Relatório
+    # 1. Dicionário de Parâmetros de Entrada
     params = {
         "Faturamento Mensal": formatar_br(fat_mes),
-        "RBT12": formatar_br(rbt12_comp),
-        "Despesas Op.": formatar_br(despesas_op),
+        "RBT12 (Simples)": formatar_br(rbt12_comp),
+        "Atividade": atividade,
+        "Despesas Operacionais": formatar_br(despesas_op),
         "Insumos c/ Crédito": formatar_br(insumos_cred),
-        "Folha/Pró-Labore": formatar_br(folha_comp)
+        "Folha / Pró-Labore": formatar_br(folha_comp),
+        "Modelo Tributário": modelo_tributario,
+        "Anexo Simples": anexo_simples,
+        "Distribuição de Lucro": formatar_br(distribuicao_lucro)
     }
 
     lbl_faturam = "Impostos s/ Venda (PIS/COFINS/ICMS)" if "Atual" in modelo_tributario else "Impostos s/ Venda (CBS/IBS)"
@@ -1601,14 +1640,36 @@ elif st.session_state.pagina_selecionada == "📊 Planejamento Tributário Compa
         ["Lucro Real", formatar_br(res_real["Subtotal Faturamento"]), formatar_br(res_real["Subtotal Renda"]), formatar_br(res_real["INSS Patronal"]), formatar_br(res_real["IRRF Lucros (>50k)"]), formatar_br(res_real["Total Tributos"]), f"{res_real['Aliquota Efetiva']:.2f}%"]
     ]
 
-    rec = f"O regime do <strong>{vencedor_nome}</strong> apresenta a menor carga tributária total, gerando um desembolso estimado de <strong>{formatar_br(menor_valor)}</strong> por mês."
-    obs = f"Modelo aplicado: {modelo_tributario}. Os cálculos do Presumido/Real consideram as presunções atualizadas (+10%) e retenções da Lei nº 15.270 para distribuições de lucro acima de R$ 50.000,00."
+    # 2. Dicionários para Memória de Cálculo no Relatório
+    mem_presumido = {
+        "Presunção Aplicada (+10%)": res_presumido["Base IRPJ/CSLL"],
+        "IRPJ (15% + Adicional)": formatar_br(res_presumido["IRPJ"]),
+        "CSLL (9%)": formatar_br(res_presumido["CSLL"]),
+        res_presumido["Label Trib 1"]: formatar_br(res_presumido["Val Trib 1"]),
+        res_presumido["Label Trib 2"]: formatar_br(res_presumido["Val Trib 2"]),
+        "INSS Patronal (27,8%)": formatar_br(res_presumido["INSS Patronal"])
+    }
 
-    # 3. Geração e Exibição do HTML
-    html_final = gerar_relatorio_html("Relatório de Planejamento Tributário Comparativo", params, colunas, dados, rec, obs)
+    mem_real = {
+        "Base Lucro Real": res_real["Base IRPJ/CSLL"],
+        "IRPJ (15% + Adicional)": formatar_br(res_real["IRPJ"]),
+        "CSLL (9%)": formatar_br(res_real["CSLL"]),
+        res_real["Label Trib 1"]: formatar_br(res_real["Val Trib 1"]),
+        res_real["Label Trib 2"]: formatar_br(res_real["Val Trib 2"]),
+        "INSS Patronal (27,8%)": formatar_br(res_real["INSS Patronal"])
+    }
+
+    rec = f"O regime do <strong>{vencedor_nome}</strong> apresenta a menor carga tributária total, gerando um desembolso estimado de <strong>{formatar_br(menor_valor)}</strong> por mês."
+    obs = f"Cenário apurado sob o <strong>{modelo_tributario}</strong>. Presunções do Lucro Presumido reajustadas em +10% e retenções da Lei nº 15.270 incidentes sobre parcelas de lucros que superam R$ 50.000,00/mês."
+
+    # 3. Geração e Exibição do HTML Único
+    html_final = gerar_relatorio_html(
+        "Relatório Estratégico de Planejamento Tributário Comparativo", 
+        params, colunas, dados, mem_presumido, mem_real, rec, obs
+    )
 
     html_com_botao = f"""
-    <div style="text-align: right; margin-bottom: 15px;" class="no-print">
+    <div style="text-align: right; margin-bottom: 12px;" class="no-print">
         <button onclick="window.print()" style="background-color: #0f172a; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 13px;">
             🖨️ Imprimir / Salvar PDF
         </button>
@@ -1619,4 +1680,4 @@ elif st.session_state.pagina_selecionada == "📊 Planejamento Tributário Compa
     {html_final}
     """
 
-    st.components.v1.html(html_com_botao, height=650, scrolling=True)
+    st.components.v1.html(html_com_botao, height=850, scrolling=True)
