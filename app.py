@@ -9,7 +9,6 @@ from datetime import datetime
 # FUNÇÃO REUTILIZÁVEL DE IMPRESSÃO (COLOQUE LOGO APÓS OS IMPORTS)
 # ==============================================================================
 def gerar_relatorio_html(titulo_modulo, parametros_dict, colunas_tabela, dados_tabela, recomendacao_txt, obs_txt):
-    import datetime
     data_emissao = datetime.now().strftime("%d/%m/%Y às %H:%M")
     
     linhas_html = ""
