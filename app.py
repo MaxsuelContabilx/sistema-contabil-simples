@@ -112,20 +112,12 @@ def gerar_relatorio_html(titulo_modulo, parametros_dict, colunas_tabela, dados_t
         <div class="section-title">💡 Diagnóstico Estratégico e Parecer Fiscal</div>
         <div class="card-diag card-green"><div class="card-title">🔴 Recomendação de Enquadramento:</div>{recomendacao_txt}</div>
         <div class="card-diag card-blue"><div class="card-title">🔵 Observações da Legislação:</div>{obs_txt}</div>
-        <style>
-            @media print {
-                * {
-                    -webkit-print-color-adjust: exact !important;
-                    print-color-adjust: exact !important;
-                }
-            }
-        </style>
-        <script>
-            window.onload = function() {{ window.print(); }};
-        </script>
-    </body>
-    </html>
-    """
+    <script>
+        window.onload = function() {{ window.print(); }};
+    </script>
+</body>
+</html>
+"""
 # Configuração da Página
 st.set_page_config(page_title="Maxsuel Contabilidade - Gestão e Estratégia", layout="wide")
 
