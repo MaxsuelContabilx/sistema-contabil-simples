@@ -1572,8 +1572,8 @@ elif st.session_state.pagina_selecionada == "📊 Planejamento Tributário Compa
 
     st.success(f"🏆 **Cenário Mais Vantajoso:** O **{vencedor}** apresenta a menor carga fiscal global de **{formatar_br(menor_valor)}**.")
 # ==============================================================================
-# FINAL DA TELA 5: MONTAGEM E IMPRESSÃO DO RELATÓRIO EXECUTIVO
-# ==============================================================================
+    # FINAL DA TELA 5: MONTAGEM E IMPRESSÃO DO RELATÓRIO EXECUTIVO
+    # ==============================================================================
     params = {
         "Faturamento Mensal": formatar_br(fat_mes),
         "RBT12": formatar_br(rbt12_comp),
@@ -1594,12 +1594,21 @@ elif st.session_state.pagina_selecionada == "📊 Planejamento Tributário Compa
     rec = f"O regime do <strong>{vencedor_nome}</strong> apresenta a menor carga tributária total, gerando um desembolso estimado de <strong>{formatar_br(menor_valor)}</strong> por mês."
     obs = f"Modelo aplicado: {modelo_tributario}. Os cálculos do Presumido/Real consideram as presunções atualizadas (+10%) e retenções da Lei nº 15.270 para distribuições de lucro acima de R$ 50.000,00."
 
-    # Gera o relatório com a marca da Maxsuel Contabilidade
+    # Gera o HTML chamando a função
     html_final = gerar_relatorio_html("Relatório de Planejamento Tributário Comparativo", params, colunas, dados, rec, obs)
 
-    # Exibe na tela do Streamlit
-    st.components.v1.html(html_final, height=520, scrolling=True)
+    # Injeta o botão de impressão nativo diretamente no topo da folha
+    html_com_botao = f"""
+    <div style="text-align: right; margin-bottom: 15px;" class="no-print">
+        <button onclick="window.print()" style="background-color: #0f172a; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 13px;">
+            🖨️ Imprimir / Salvar PDF
+        </button>
+    </div>
+    <style>
+        @media print {{ .no-print {{ display: none !important; }} }}
+    </style>
+    {html_final}
+    """
 
-    # Botão para disparar a janela de impressão/PDF
-    if st.button("🖨️ Imprimir / Salvar PDF"):
-        st.components.v1.html(f"<script>{html_final} window.print();</script>", height=0)
+    # Exibe o Relatório completo com o Botão embutido
+    st.components.v1.html(html_com_botao, height=650, scrolling=True)
