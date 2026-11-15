@@ -1,101 +1,153 @@
-import base64
+import streamlit as st
+import pandas as pd
 import os
+import base64
 import sqlite3
 from datetime import datetime
-from io import BytesIO
 
-import pandas as pd
-import streamlit as st
+def gerar_relatorio_html(titulo_modulo, parametros_dict, colunas_tabela, dados_tabela, mem_presumido, mem_real, recomendacao_txt, obs_txt):
+    data_emissao = datetime.now().strftime("%d/%m/%Y às %H:%M")
+    
+    # Linhas da tabela comparativa
+    linhas_html = ""
+    for linha in dados_tabela:
+        linhas_html += "<tr>"
+        for idx, valor in enumerate(linha):
+            cls = "class='highlight-col'" if idx in [0, len(linha)-2] else ""
+            linhas_html += f"<td {cls}>{valor}</td>"
+        linhas_html += "</tr>"
 
-from tax_engine import (
-    ATIVIDADES_PRESUMIDO,
-    CRONOGRAMA_TRANSICAO_IVA,
-    REDUCOES_ALIQUOTA_LC214,
-    TABELAS_SIMPLES_NACIONAL,
-    ParametrosSimulacao,
-    calcular_irrf_dividendos_2026,
-    calcular_lucro_presumido,
-    calcular_lucro_real,
-    calcular_simples_nacional,
-    executar_simulacao_completa,
-    validar_premissas,
-)
+    # Parâmetros em grid
+    params_html = "".join([f"<div><span class='param-item'>{k}:</span> <span class='param-value'>{v}</span></div>" for k, v in parametros_dict.items()])
 
-# ==============================================================================
-# CONFIGURAÇÃO DA PÁGINA E ESTILO VISUAL (MAXSUEL CONTABILIDADE)
-# ==============================================================================
-st.set_page_config(
-    page_title="Maxsuel Gestão Contábil & Planejamento Tributário",
-    page_icon="⚖️",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
+    # Detalhamento Memória de Cálculo (Presumido)
+    detalhe_presumido_html = "".join([f"<li><strong>{k}:</strong> {v}</li>" for k, v in mem_presumido.items()])
+    
+    # Detalhamento Memória de Cálculo (Real)
+    detalhe_real_html = "".join([f"<li><strong>{k}:</strong> {v}</li>" for k, v in mem_real.items()])
 
-st.markdown(
-    """
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <meta charset="utf-8">
     <style>
-        .main { background-color: #f8fafc; }
-        .stMetric {
-            background-color: #ffffff;
-            padding: 14px 16px;
-            border-radius: 10px;
-            border-left: 4px solid #0f2a4a;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-        }
-        .legal-badge {
-            display: inline-block;
-            background: #e2e8f0;
-            color: #0f2a4a;
-            padding: 3px 9px;
-            border-radius: 6px;
-            font-size: 12px;
-            font-weight: 600;
-            margin-bottom: 6px;
-        }
+        body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; margin: 15px; background-color: #ffffff; }}
+        .header-table {{ width: 100%; border-collapse: collapse; margin-bottom: 5px; }}
+        .header-title {{ font-size: 20px; font-weight: bold; color: #0f172a; margin: 0; }}
+        .header-subtitle {{ font-size: 12px; color: #475569; margin-top: 3px; }}
+        .divider {{ border-top: 2px solid #0f172a; margin: 8px 0 12px 0; }}
+        .meta-info {{ font-size: 11px; color: #64748b; text-align: right; margin-bottom: 15px; }}
+        .section-title {{ font-size: 13px; font-weight: bold; color: #0f172a; margin-top: 15px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }}
+        
+        /* Parâmetros */
+        .params-box {{ background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; font-size: 11px; margin-bottom: 15px; }}
+        .params-grid {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }}
+        .param-item {{ font-weight: 600; color: #334155; }}
+        .param-value {{ font-weight: 400; color: #64748b; }}
+        
+        /* Tabelas */
+        .report-table {{ width: 100%; border-collapse: collapse; margin-top: 5px; font-size: 11px; }}
+        .report-table th {{ background-color: #0f172a; color: #ffffff; padding: 8px; text-align: left; font-weight: 600; }}
+        .report-table td {{ padding: 7px 8px; border-bottom: 1px solid #e2e8f0; }}
+        .report-table tr:nth-child(even) {{ background-color: #f8fafc; }}
+        .highlight-col {{ font-weight: bold; color: #0f172a; }}
+
+        /* Bloco da Memória de Cálculo (2 Colunas) */
+        .memory-container {{ display: flex; gap: 12px; margin-top: 5px; }}
+        .memory-card {{ flex: 1; background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px; font-size: 11px; }}
+        .memory-card-title {{ font-weight: bold; color: #0f172a; font-size: 12px; margin-bottom: 6px; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; }}
+        .memory-card ul {{ margin: 0; padding-left: 15px; color: #334155; }}
+        .memory-card li {{ margin-bottom: 4px; }}
+
+        /* Diagnósticos */
+        .card-diag {{ border-radius: 6px; padding: 10px; margin-top: 10px; font-size: 11px; }}
+        .card-green {{ background-color: #f0fdf4; border-left: 4px solid #16a34a; color: #166534; }}
+        .card-blue {{ background-color: #f0f9ff; border-left: 4px solid #0284c7; color: #075985; }}
+        .card-title {{ font-weight: bold; font-size: 12px; margin-bottom: 3px; }}
+
+       @media print {{
+        .no-print {{ display: none !important; }}
+        body {{ margin: 0; padding: 0; }}
+        * {{
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }}
+    }}
     </style>
-    """,
-    unsafe_allow_html=True,
-)
+    </head>
+    <body>
+        <table class="header-table">
+            <tr>
+                <td>
+                    <div class="header-title">Maxsuel Contabilidade</div>
+                    <div class="header-subtitle">{titulo_modulo}</div>
+                </td>
+                <td style="text-align: right; vertical-align: middle;">
+                    <strong style="font-size: 18px; color: #0f172a;">M$</strong><br>
+                    <span style="font-size: 9px; color: #64748b; letter-spacing: 1px;">MAXSUEL</span>
+                </td>
+            </tr>
+        </table>
+        <div class="divider"></div>
+        <div class="meta-info">Emitido em: {data_emissao}</div>
 
+        <div class="section-title">📌 Parâmetros Operacionais e Financeiros</div>
+        <div class="params-box"><div class="params-grid">{params_html}</div></div>
 
-def formatar_br(valor: float) -> str:
-    try:
-        return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-    except Exception:
-        return "R$ 0,00"
+        <div class="section-title">📊 Resumo Consolidado de Carga Tributária</div>
+        <table class="report-table">
+            <thead><tr>{''.join([f'<th>{col}</th>' for col in colunas_tabela])}</tr></thead>
+            <tbody>{linhas_html}</tbody>
+        </table>
 
+        <div class="section-title">🔍 Detalhamento das Bases e Memória de Apuração</div>
+        <div class="memory-container">
+            <div class="memory-card">
+                <div class="memory-card-title">Lucro Presumido</div>
+                <ul>{detalhe_presumido_html}</ul>
+            </div>
+            <div class="memory-card">
+                <div class="memory-card-title">Lucro Real</div>
+                <ul>{detalhe_real_html}</ul>
+            </div>
+        </div>
 
-def obter_logo_base64(caminho_img: str):
-    if os.path.exists(caminho_img):
-        with open(caminho_img, "rb") as image_file:
-            return base64.b64encode(image_file.read()).decode("utf-8")
-    return None
-
+        <div class="section-title">💡 Diagnóstico Estratégico e Parecer Fiscal</div>
+        <div class="card-diag card-green"><div class="card-title">🔴 Recomendação de Enquadramento:</div>{recomendacao_txt}</div>
+        <div class="card-diag card-blue"><div class="card-title">🔵 Observações da Legislação:</div>{obs_txt}</div>
+    <script>
+        window.onload = function() {{ window.print(); }};
+    </script>
+</body>
+</html>
+"""
+# Configuração da Página
+st.set_page_config(page_title="Maxsuel Contabilidade - Gestão e Estratégia", layout="wide")
 
 # ==============================================================================
-# BANCO DE DADOS RELACIONAL (SQLITE) - MÓDULO CONTÁBIL INTEGRADO
+# 1. ATUALIZAÇÃO: INICIALIZAÇÃO DO BANCO DE DADOS (SQLITE)
 # ==============================================================================
-DB_PATH = "maxsuel_contabilidade.db"
-
+# Garante que o banco de dados seja salvo em um caminho absoluto e fixo
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_NOME = os.path.join(BASE_DIR, "maxsuel_contabilidade.db")
 
 def conectar_db():
-    return sqlite3.connect(DB_PATH, check_same_thread=False)
-
+    return sqlite3.connect(DB_NOME)
 
 def inicializar_banco():
     conn = conectar_db()
     cursor = conn.cursor()
-    cursor.execute(
-        """
+    # Tabela de Empresas
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS empresas (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nome TEXT NOT NULL,
-            cnpj TEXT NOT NULL UNIQUE
+            cnpj TEXT UNIQUE NOT NULL
         )
-        """
-    )
-    cursor.execute(
-        """
+    """)
+    # Tabela de Lançamentos Contábeis (amarrada à Empresa)
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS lancamentos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             empresa_id INTEGER NOT NULL,
@@ -106,713 +158,1533 @@ def inicializar_banco():
             historico TEXT,
             FOREIGN KEY (empresa_id) REFERENCES empresas(id)
         )
-        """
-    )
+    """)
     conn.commit()
     conn.close()
 
-
+# Executa a criação das tabelas se não existirem
 inicializar_banco()
 
+# ==============================================================================
+# 2. ATUALIZAÇÃO: PLANO DE CONTAS EXPANDIDO (INCLUSÃO DE DIVIDENDOS)
+# ==============================================================================
+plano_de_contas = {
+    "1.01": "Caixa/Banco", 
+    "1.02": "Estoque", 
+    "1.03": "Clientes a Receber", 
+    "1.04": "Imobilizado",
+    "2.01": "Fornecedores", 
+    "2.02": "Provisões", 
+    "2.03": "Empréstimos", 
+    "2.04": "Dividendos a Pagar (Passivo)", 
+    "2.05": "Capital Social",
+    "2.06": "Lucros Acumulados", # <-- Nova Conta de Histórico/Obrigação
+    "4.01": "Receita de Vendas", 
+    "5.01": "Despesas Operacionais", 
+    "5.02": "Antecipação/Distribuição de Dividendos", # <-- Nova Conta de Resultado/Dedução
+    "6.01": "Impostos", 
+    "7.01": "ARE"
+}
 
-def carregar_empresas() -> pd.DataFrame:
+# --- FUNÇÃO DE FORMATAÇÃO DE MOEDA PT-BR ---
+def formatar_br(valor):
+    try:
+        val_formatado = "{:,.2f}".format(valor)
+        return "R$ " + val_formatado.replace(",", "X").replace(".", ",").replace("X", ".")
+    except:
+        return "R$ 0,00"
+# ==============================================================================
+# FUNÇÕES DE CÁLCULO (PRESUNÇÕES +10% E DINÂMICA MODELO ATUAL VS REFORMA)
+# ==============================================================================
+def calcular_lucro_presumido(faturamento_mes, atividade, folha_mes=0.0, distribuicao_lucro=0.0, modelo="Modelo Atual"):
+    # 1. Presunções para Renda com aumento de 10%
+    p_irpj_base = 0.08 if atividade == "Comércio / Indústria" else 0.32
+    p_csll_base = 0.12 if atividade == "Comércio / Indústria" else 0.32
+
+    p_irpj = p_irpj_base * 1.10  # Ex: 8,0% -> 8,8% | 32,0% -> 35,2%
+    p_csll = p_csll_base * 1.10  # Ex: 12,0% -> 13,2% | 32,0% -> 35,2%
+
+    base_irpj = faturamento_mes * p_irpj
+    base_csll = faturamento_mes * p_csll
+
+    # 2. Tributos sobre Renda (IRPJ + CSLL)
+    irpj_base = base_irpj * 0.15
+    irpj_adic = max(0.0, (base_irpj - 20000.0) * 0.10)
+    irpj_total = irpj_base + irpj_adic
+    csll_total = base_csll * 0.09
+    tot_renda = irpj_total + csll_total
+
+    # 3. Tributos sobre Faturamento (Modelo Atual vs Reforma)
+    if "Atual" in modelo:
+        trib_fatura_1_label = "PIS/COFINS (3,65%)"
+        trib_fatura_1_val = faturamento_mes * 0.0365
+        trib_fatura_2_label = "ICMS/ISS Est. (5,00%)"
+        trib_fatura_2_val = faturamento_mes * 0.05
+    else:
+        trib_fatura_1_label = "CBS - Federal (9,21%)"
+        trib_fatura_1_val = faturamento_mes * 0.088
+        trib_fatura_2_label = "IBS - Est./Mun. (18,70%)"
+        trib_fatura_2_val = faturamento_mes * 0.177
+
+    tot_faturamento = trib_fatura_1_val + trib_fatura_2_val
+
+    # 4. Folha e Lucros
+    inss_patronal = folha_mes * 0.278
+    irrf_distribuicao = max(0.0, (distribuicao_lucro - 50000.0) * 0.10) if distribuicao_lucro > 50000.0 else 0.0
+
+    tot_geral = tot_renda + tot_faturamento + inss_patronal + irrf_distribuicao
+
+    return {
+        "Regime": "Lucro Presumido",
+        "Base IRPJ/CSLL": f"{p_irpj*100:.1f}% / {p_csll*100:.1f}% (+10%)",
+        "IRPJ": irpj_total,
+        "CSLL": csll_total,
+        "Subtotal Renda": tot_renda,
+        "Label Trib 1": trib_fatura_1_label,
+        "Val Trib 1": trib_fatura_1_val,
+        "Label Trib 2": trib_fatura_2_label,
+        "Val Trib 2": trib_fatura_2_val,
+        "Subtotal Faturamento": tot_faturamento,
+        "INSS Patronal": inss_patronal,
+        "IRRF Lucros (>50k)": irrf_distribuicao,
+        "Total Tributos": tot_geral,
+        "Aliquota Efetiva": (tot_geral / faturamento_mes * 100) if faturamento_mes > 0 else 0
+    }
+
+def calcular_lucro_real(faturamento_mes, despesas_op, insumos_cred, folha_mes=0.0, distribuicao_lucro=0.0, modelo="Modelo Atual"):
+    # 1. Tributos sobre Faturamento (Modelo Atual vs Reforma)
+    if "Atual" in modelo:
+        debito = faturamento_mes * 0.0925
+        credito = insumos_cred * 0.0925
+        trib_fatura_1_val = max(0.0, debito - credito)
+        trib_fatura_1_label = "PIS/COFINS Líquido"
+        
+        trib_fatura_2_val = faturamento_mes * 0.05
+        trib_fatura_2_label = "ICMS/ISS Est. (5,00%)"
+    else:
+        # No IVA Dual (Não-cumulativo pleno)
+        cbs_liq = max(0.0, (faturamento_mes - insumos_cred) * 0.0921)
+        ibs_liq = max(0.0, (faturamento_mes - insumos_cred) * 0.187)
+        
+        trib_fatura_1_val = cbs_liq
+        trib_fatura_1_label = "CBS Líquida (9,21%)"
+        trib_fatura_2_val = ibs_liq
+        trib_fatura_2_label = "IBS Líquido (18,70%)"
+
+    tot_faturamento = trib_fatura_1_val + trib_fatura_2_val
+
+    # 2. Base de Renda (Lucro Real Operacional)
+    lucro_operacional = faturamento_mes - despesas_op - tot_faturamento
+
+    if lucro_operacional > 0:
+        irpj_base = lucro_operacional * 0.15
+        irpj_adic = max(0.0, (lucro_operacional - 20000.0) * 0.10)
+        irpj_total = irpj_base + irpj_adic
+        csll_total = lucro_operacional * 0.09
+    else:
+        irpj_total, csll_total = 0.0, 0.0
+
+    tot_renda = irpj_total + csll_total
+
+    # 3. Folha e Lucros
+    inss_patronal = folha_mes * 0.278
+    irrf_distribuicao = max(0.0, (distribuicao_lucro - 50000.0) * 0.10) if distribuicao_lucro > 50000.0 else 0.0
+
+    tot_geral = tot_renda + tot_faturamento + inss_patronal + irrf_distribuicao
+
+    return {
+        "Regime": "Lucro Real",
+        "Base IRPJ/CSLL": f"Lucro Real (R$ {max(0.0, lucro_operacional):,.2f})",
+        "IRPJ": irpj_total,
+        "CSLL": csll_total,
+        "Subtotal Renda": tot_renda,
+        "Label Trib 1": trib_fatura_1_label,
+        "Val Trib 1": trib_fatura_1_val,
+        "Label Trib 2": trib_fatura_2_label,
+        "Val Trib 2": trib_fatura_2_val,
+        "Subtotal Faturamento": tot_faturamento,
+        "INSS Patronal": inss_patronal,
+        "IRRF Lucros (>50k)": irrf_distribuicao,
+        "Total Tributos": tot_geral,
+        "Aliquota Efetiva": (tot_geral / faturamento_mes * 100) if faturamento_mes > 0 else 0
+    }
+# --- FUNÇÃO PARA CONVERTER IMAGEM LOCAL PARA BASE64 ---
+def obter_logo_base64(caminho_img):
+    if os.path.exists(caminho_img):
+        with open(caminho_img, "rb") as image_file:
+            return base64.b64encode(image_file.read()).decode('utf-8')
+    return None
+
+# ==============================================================================
+# 3. ATUALIZAÇÃO: FUNÇÕES DE CARGA E SALVAMENTO ADAPTADAS PARA O BANCO DE DADOS
+# ==============================================================================
+def carregar_lancamentos_db(empresa_id):
     conn = conectar_db()
-    df = pd.read_sql_query("SELECT id, nome, cnpj FROM empresas ORDER BY nome", conn)
-    conn.close()
-    return df
-
-
-def carregar_lancamentos_db(empresa_id: int) -> list:
-    conn = conectar_db()
-    df = pd.read_sql_query(
-        "SELECT id, data, debito, credito, valor, historico FROM lancamentos WHERE empresa_id = ? ORDER BY data DESC, id DESC",
-        conn,
-        params=(int(empresa_id),),
-    )
+    query = "SELECT id AS [Nº Lançamento], data AS Data, debito AS Debito, credito AS Credito, valor AS Valor, historico AS Historico FROM lancamentos WHERE empresa_id = ?"
+    df = pd.read_sql_query(query, conn, params=(int(empresa_id),))
     conn.close()
     return df.to_dict(orient="records")
 
-
-def salvar_lancamento_db(empresa_id: int, data, debito: str, credito: str, valor: float, historico: str):
+def salvar_lancamento_db(empresa_id, data, debito, credito, valor, historico):
     conn = conectar_db()
     cursor = conn.cursor()
-    cursor.execute(
-        "INSERT INTO lancamentos (empresa_id, data, debito, credito, valor, historico) VALUES (?, ?, ?, ?, ?, ?)",
-        (int(empresa_id), str(data), debito, credito, float(valor), historico),
-    )
+    cursor.execute("""
+        INSERT INTO lancamentos (empresa_id, data, debito, credito, valor, historico)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (int(empresa_id), str(data), debito, credito, float(valor), historico))
     conn.commit()
     conn.close()
 
-
-PLANO_DE_CONTAS = {
-    "1.01": "Caixa e Equivalentes de Caixa",
-    "1.02": "Bancos Conta Movimento",
-    "1.03": "Clientes / Duplicatas a Receber",
-    "1.04": "Estoques de Mercadorias",
-    "1.05": "Imobilizado",
-    "2.01": "Fornecedores a Pagar",
-    "2.02": "Obrigações Fiscais e Tributárias",
-    "2.03": "Salários e Encargos a Pagar",
-    "2.04": "Empréstimos e Financiamentos",
-    "2.05": "Capital Social / Lucros Acumulados",
-    "4.01": "Receita Bruta de Vendas e Serviços",
-    "5.01": "Despesas Operacionais e Administrativas",
-    "5.02": "Distribuição de Lucros e Dividendos",
-    "6.01": "Impostos e Contribuições Incidentes",
-}
-
-
-def calcular_saldos(empresa_id: int) -> dict:
+def carregar_empresas():
     conn = conectar_db()
-    df_l = pd.read_sql_query("SELECT * FROM lancamentos WHERE empresa_id = ?", conn, params=(int(empresa_id),))
+    df = pd.read_sql_query("SELECT * FROM empresas ORDER BY nome ASC", conn)
     conn.close()
-    saldos = {}
-    for cod in PLANO_DE_CONTAS:
-        deb = df_l[df_l["debito"] == cod]["valor"].sum() if not df_l.empty else 0.0
-        cred = df_l[df_l["credito"] == cod]["valor"].sum() if not df_l.empty else 0.0
-        if cod.startswith(("1", "5", "6")):
-            saldos[cod] = float(deb - cred)
-        else:
-            saldos[cod] = float(cred - deb)
-    return saldos
-
+    return df
 
 # ==============================================================================
-# GERADOR DE RELATÓRIO HTML EXECUTIVO PARA IMPRESSÃO / EXPORTAÇÃO
+# 4. ATUALIZAÇÃO: BUSCA DE EMPRESAS PARA A BARRA LATERAL
 # ==============================================================================
-def gerar_relatorio_html(
-    titulo_modulo: str,
-    parametros_dict: dict,
-    colunas_tabela: list,
-    dados_tabela: list,
-    mem_presumido: dict,
-    mem_real: dict,
-    mem_simples: dict,
-    recomendacao: str,
-    observacao: str,
-    alertas: list,
-) -> str:
-    linhas_params = "".join(
-        f"<tr><td style='font-weight:600;color:#334155;'>{k}</td><td>{v}</td></tr>"
-        for k, v in parametros_dict.items()
-    )
-    ths = "".join(f"<th>{c}</th>" for c in colunas_tabela)
-    trs = "".join(
-        "<tr>" + "".join(f"<td>{cell}</td>" for cell in row) + "</tr>"
-        for row in dados_tabela
-    )
+df_empresas = carregar_empresas()
 
-    def _dict_rows(d):
-        return "".join(f"<tr><td>{k}</td><td style='text-align:right;font-weight:600;'>{v}</td></tr>" for k, v in d.items())
+# --- BARRA LATERAL ---
+nome_logo = "Logo - Empresa Max contabil_2.png"
+logo_base64 = obter_logo_base64(nome_logo)
 
-    alertas_html = ""
-    if alertas:
-        items = "".join(f"<li><strong>{a['titulo']}:</strong> {a['mensagem']}</li>" for a in alertas)
-        alertas_html = f"<div class='alert-box'><h4>⚠️ Alertas Legais e Premissas Sinalizadas</h4><ul>{items}</ul></div>"
+if logo_base64:
+    st.sidebar.image(nome_logo, use_container_width=True)
+else:
+    st.sidebar.markdown("<h2 style='text-align: center; color: #0f2a4a;'>MAXSUEL</h2>", unsafe_allow_html=True)
+    st.sidebar.markdown("<p style='text-align: center; margin-top: -15px; font-weight: bold;'>CONTABILIDADE</p>", unsafe_allow_html=True)
 
-    return f"""<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<title>{titulo_modulo}</title>
-<style>
-  body {{ font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; margin: 32px; background: #fff; }}
-  .header {{ border-bottom: 3px solid #0f2a4a; padding-bottom: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end; }}
-  .header h1 {{ margin: 0; color: #0f2a4a; font-size: 20px; }}
-  .header .sub {{ color: #64748b; font-size: 12px; }}
-  h3 {{ color: #0f2a4a; border-left: 4px solid #d4af37; padding-left: 8px; margin-top: 22px; font-size: 15px; }}
-  table {{ width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px; }}
-  th {{ background: #0f2a4a; color: #fff; text-align: left; padding: 8px; }}
-  td {{ border: 1px solid #cbd5e1; padding: 7px 8px; }}
-  tr:nth-child(even) td {{ background: #f8fafc; }}
-  .grid3 {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 10px; }}
-  .card {{ border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px; }}
-  .rec-box {{ background: #ecfdf5; border: 1px solid #10b981; border-radius: 6px; padding: 12px; margin-top: 16px; font-size: 13px; }}
-  .alert-box {{ background: #fffbeb; border: 1px solid #f59e0b; border-radius: 6px; padding: 12px; margin-top: 16px; font-size: 12px; }}
-  .footer {{ margin-top: 28px; font-size: 11px; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 8px; }}
-</style>
-</head>
-<body>
-  <div class="header">
-    <div>
-      <h1>MAXSUEL GESTÃO CONTÁBIL & ESTRATÉGICA</h1>
-      <div class="sub">{titulo_modulo}</div>
-    </div>
-    <div class="sub">Emitido em {datetime.now().strftime('%d/%m/%Y %H:%M')}</div>
-  </div>
-  <h3>Parâmetros da Simulação</h3>
-  <table><tbody>{linhas_params}</tbody></table>
-  <h3>Quadro Comparativo dos Regimes Tributários</h3>
-  <table><thead><tr>{ths}</tr></thead><tbody>{trs}</tbody></table>
-  <div class="grid3">
-    <div class="card"><strong>Simples Nacional</strong><table>{_dict_rows(mem_simples)}</table></div>
-    <div class="card"><strong>Lucro Presumido</strong><table>{_dict_rows(mem_presumido)}</table></div>
-    <div class="card"><strong>Lucro Real</strong><table>{_dict_rows(mem_real)}</table></div>
-  </div>
-  <div class="rec-box"><strong>Conclusão Técnica:</strong> {recomendacao}<br><span style="font-size:12px;color:#334155;">{observacao}</span></div>
-  {alertas_html}
-  <div class="footer">Fundamentação: LC nº 123/2006, Res. CGSN nº 140/2018 e nº 190/2026, LC nº 214/2025, Dec. nº 12.955/2026, LC nº 224/2025, RIR/2018 e Lei nº 15.270/2025.</div>
-</body>
-</html>"""
+st.sidebar.divider()
 
+# SELETOR DE EMPRESA ATIVA
+st.sidebar.subheader("🏢 Empresa em Operação")
+if not df_empresas.empty:
+    lista_empresas = df_empresas["nome"].tolist()
+    empresa_selecionada = st.sidebar.selectbox("Escolha a Empresa:", lista_empresas)
+    empresa_id_atual = df_empresas[df_empresas["nome"] == empresa_selecionada]["id"].values[0]
+    cnpj_empresa_atual = df_empresas[df_empresas["nome"] == empresa_selecionada]["cnpj"].values[0]
+else:
+    st.sidebar.warning("Nenhuma empresa cadastrada no sistema.")
+    empresa_id_atual = None
+    cnpj_empresa_atual = ""
 
-# ==============================================================================
-# NAVEGAÇÃO PRINCIPAL (SIDEBAR)
-# ==============================================================================
+st.sidebar.divider()
+
+# CONTROLADOR DE NAVEGAÇÃO INTERNA
 opcoes_menu = [
-    "🏠 Menu Principal",
-    "📊 Planejamento Tributário Comparativo",
+    "🏠 Menu Principal", 
+    "💻 Módulo Contábil", 
     "🧮 Simulador Simples Nacional",
     "📋 Módulo de Folha & Fator R",
-    "💻 Módulo Contábil",
+    "📊 Planejamento Tributário Comparativo"  # <-- ADICIONE ESTA LINHA
 ]
 
-if "pagina_selecionada" not in st.session_state:
+if 'pagina_selecionada' not in st.session_state:
     st.session_state.pagina_selecionada = "🏠 Menu Principal"
 
-with st.sidebar:
-    st.markdown("## ⚖️ Maxsuel Contabilidade")
-    st.caption("Plataforma Unificada de Planejamento Tributário & Contábil")
+try:
     idx_atual = opcoes_menu.index(st.session_state.pagina_selecionada)
-    opcao_menu = st.radio("Navegação:", opcoes_menu, index=idx_atual)
-    if opcao_menu != st.session_state.pagina_selecionada:
-        st.session_state.pagina_selecionada = opcao_menu
-        st.rerun()
+except ValueError:
+    idx_atual = 0
 
-    st.divider()
-    df_empresas = carregar_empresas()
-    empresa_id_atual = None
-    empresa_selecionada = None
-    cnpj_empresa_atual = None
-    if not df_empresas.empty:
-        nomes_emp = df_empresas["nome"].tolist()
-        empresa_selecionada = st.selectbox("Empresa Ativa (Módulo Contábil):", nomes_emp)
-        row_emp = df_empresas[df_empresas["nome"] == empresa_selecionada].iloc[0]
-        empresa_id_atual = int(row_emp["id"])
-        cnpj_empresa_atual = row_emp["cnpj"]
-        st.session_state.livro_diario = carregar_lancamentos_db(empresa_id_atual)
-    else:
-        st.info("Nenhuma empresa cadastrada no banco local.")
-        st.session_state.livro_diario = []
+opcao_menu = st.sidebar.radio("Navegação do Sistema", opcoes_menu, index=idx_atual, key="nav_radio")
 
+if opcao_menu != st.session_state.pagina_selecionada:
+    st.session_state.pagina_selecionada = opcao_menu
+    st.rerun()
+
+# Atualiza a memória de lançamentos com base na empresa ativa da barra lateral
+if empresa_id_atual:
+    st.session_state.livro_diario = carregar_lancamentos_db(empresa_id_atual)
+else:
+    st.session_state.livro_diario = []
+
+# TABELAS OFICIAIS DO SIMPLES NACIONAL
+TABELAS_PADRAO = {
+    "Anexo I - Comércio": [(180000.0, 0.040, 0.0), (360000.0, 0.073, 5940.0), (720000.0, 0.095, 13860.0), (1800000.0, 0.107, 22500.0), (3600000.0, 0.143, 87300.0), (4800000.0, 0.190, 378000.0)],
+    "Anexo II - Indústria": [(180000.0, 0.045, 0.0), (360000.0, 0.078, 5940.0), (720000.0, 0.100, 13860.0), (1800000.0, 0.112, 22500.0), (3600000.0, 0.147, 85500.0), (4800000.0, 0.300, 720000.0)],
+    "Anexo III - Serviços": [(180000.0, 0.060, 0.0), (360000.0, 0.112, 9360.0), (720000.0, 0.135, 17640.0), (1800000.0, 0.160, 35640.0), (3600000.0, 0.210, 125640.0), (4800000.0, 0.330, 848000.0)],
+    "Anexo IV - Serviços": [(180000.0, 0.045, 0.0), (360000.0, 0.090, 8100.0), (720000.0, 0.102, 12420.0), (1800000.0, 0.140, 39780.0), (3600000.0, 0.220, 183780.0), (4800000.0, 0.330, 828000.0)],
+    "Anexo V - Serviços": [(180000.0, 0.155, 0.0), (360000.0, 0.180, 4500.0), (720000.0, 0.195, 9900.0), (1800000.0, 0.205, 17100.0), (3600000.0, 0.230, 62100.0), (4800000.0, 0.305, 540000.0)]
+}
+
+REPARTICAO_IMPOSTOS = {
+    "Anexo I - Comércio":   {"IRPJ": 0.055, "CSLL": 0.035, "COFINS": 0.1274, "PIS": 0.0276, "CPP": 0.415, "ICMS": 0.34, "IPI": 0.0, "ISS": 0.0},
+    "Anexo II - Indústria": {"IRPJ": 0.055, "CSLL": 0.035, "COFINS": 0.1151, "PIS": 0.0249, "CPP": 0.375, "ICMS": 0.32, "IPI": 0.075, "ISS": 0.0},
+    "Anexo III - Serviços": {"IRPJ": 0.040, "CSLL": 0.035, "COFINS": 0.1282, "PIS": 0.0278, "CPP": 0.434, "ICMS": 0.0, "IPI": 0.0, "ISS": 0.335},
+    "Anexo IV - Serviços":  {"IRPJ": 0.188, "CSLL": 0.152, "COFINS": 0.1767, "PIS": 0.0383, "CPP": 0.0, "ICMS": 0.0, "IPI": 0.0, "ISS": 0.445},
+    "Anexo V - Serviços":   {"IRPJ": 0.250, "CSLL": 0.150, "COFINS": 0.1410, "PIS": 0.0305, "CPP": 0.2885, "ICMS": 0.0, "IPI": 0.0, "ISS": 0.140}
+}
+
+def calcular_saldos():
+    saldos = {c: 0.0 for c in plano_de_contas}
+    for l in st.session_state.livro_diario:
+        try:
+            d = str(l.get("Debito", ""))
+            c = str(l.get("Credito", ""))
+            v = float(l.get("Valor", 0.0))
+            if d in saldos:
+                if d.startswith(('1', '5', '6')): saldos[d] += v
+                else: saldos[d] -= v
+            if c in saldos:
+                if c.startswith(('2', '4')): saldos[c] += v
+                else: saldos[c] -= v
+        except:
+            continue
+    return saldos
+
+saldos = calcular_saldos()
+# Ajuste do Lucro considerando a nova conta de distribuição 5.02
+lucro = (saldos.get("4.01", 0.0)) - (saldos.get("5.01", 0.0) + saldos.get("5.02", 0.0) + saldos.get("6.01", 0.0))
+
+# ==============================================================================
+# 5. ATUALIZAÇÃO: INJEÇÃO DE INSTRUÇÕES DE IMPRESSÃO VIA CSS DO NAVEGADOR
+# ==============================================================================
+st.markdown("""
+<style>
+    .custom-card-btn button {
+        border-radius: 0px 0px 10px 10px !important;
+        border: 1px solid #ddd !important;
+        border-top: none !important;
+        padding: 10px !important;
+        height: 45px !important;
+        background-color: #ffffff !important;
+        transition: all 0.3s ease;
+    }
+    .custom-card-btn button:hover {
+        background-color: #f1f5f9 !important;
+        color: #0f2a4a !important;
+        box-shadow: 0px 4px 6px rgba(0,0,0,0.05);
+    }
+    
+    /* Configuração de Impressão Limpa */
+    @media print {
+        header, [data-testid="stSidebar"], [data-testid="stHeader"], .stButton, .no-print {
+            display: none !important;
+        }
+        [data-testid="stAppViewContainer"] {
+            width: 100% !important;
+            padding: 0 !important;
+            background-color: white !important;
+        }
+        .printable-report {
+            border: 2px solid #333 !important;
+            padding: 20px !important;
+            margin-top: 20px !important;
+            color: black !important;
+        }
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # ==============================================================================
 # TELA 1: MENU PRINCIPAL
 # ==============================================================================
 if st.session_state.pagina_selecionada == "🏠 Menu Principal":
-    st.title("🏛️ Hub de Soluções Contábeis & Planejamento Tributário")
-    st.markdown(
-        "Plataforma unificada com cálculos rigorosamente fundamentados na **LC nº 123/2006**, "
-        "**Res. CGSN nº 140/2018 e nº 190/2026**, **LC nº 214/2025**, **Decreto nº 12.955/2026**, "
-        "**LC nº 224/2025**, **RIR/2018** e **Lei nº 15.270/2025**."
-    )
-
-    c1, c2, c3, c4 = st.columns(4)
-    with c1:
-        st.subheader("📊 Planejamento Tríplice")
-        st.write("Comparativo completo Simples x Presumido x Real, DRE, B2B/B2C, Transição 2026–2033 e Dividendos 2026.")
-        if st.button("Abrir Planejamento", use_container_width=True):
-            st.session_state.pagina_selecionada = "📊 Planejamento Tributário Comparativo"
-            st.rerun()
-    with c2:
-        st.subheader("🧮 Simples Nacional")
-        st.write("Anexos I a V oficiais, Fator R, segregação de receitas (exportação, ST, ISS retido) e opção IBS/CBS 2027+.")
-        if st.button("Abrir Simulador Simples", use_container_width=True):
-            st.session_state.pagina_selecionada = "🧮 Simulador Simples Nacional"
-            st.rerun()
-    with c3:
-        st.subheader("📋 Folha & Fator R")
-        st.write("Diagnóstico de Fator R (28%), encargos patronais (CPP/RAT/Terceiros) e impacto Anexo III vs V.")
-        if st.button("Abrir Folha & Fator R", use_container_width=True):
-            st.session_state.pagina_selecionada = "📋 Módulo de Folha & Fator R"
-            st.rerun()
-    with c4:
-        st.subheader("💻 Módulo Contábil")
-        st.write("Cadastro de empresas, Livro Diário, importação CSV, Balancete, DRE e Balanço Patrimonial.")
-        if st.button("Abrir Módulo Contábil", use_container_width=True):
+    st.title("🏛️ Hub de Soluções Contábeis Maxsuel")
+    st.markdown("Seja bem-vindo ao seu painel estratégico. Selecione abaixo a ferramenta que deseja operar:")
+    st.write("")
+    
+    col_card1, col_card2, col_card3 = st.columns(3)
+    
+    with col_card1:
+        st.markdown("""
+        <div style="background-color: #f0f4f8; padding: 25px; border-radius: 10px 10px 0px 0px; border-left: 5px solid #0f2a4a; min-height: 180px; border-top: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0;">
+            <h3 style="color: #0f2a4a; margin-top:0;">💻 Módulo Contábil Comercial</h3>
+            <p style="color: #333; font-size: 14px;">Realize partidas dobradas do livro diário, gere relatórios de DRE e acompanhe o fechamento do seu Balanço Patrimonial em tempo real.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown('<div class="custom-card-btn">', unsafe_allow_html=True)
+        if st.button("Acessar Contabilidade ➡️", use_container_width=True, key="btn_contabil"):
             st.session_state.pagina_selecionada = "💻 Módulo Contábil"
             st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+            
+    with col_card2:
+        st.markdown("""
+        <div style="background-color: #fffde6; padding: 25px; border-radius: 10px 10px 0px 0px; border-left: 5px solid #d4af37; min-height: 180px; border-top: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0;">
+            <h3 style="color: #6b5300; margin-top:0;">🧮 Inteligência do Simples Nacional</h3>
+            <p style="color: #333; font-size: 14px;">Simule e compare simultaneamente a carga tributária dos Anexos I, II, III, IV e V. Faça simulações e descubra o rateio exato por imposto.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown('<div class="custom-card-btn">', unsafe_allow_html=True)
+        if st.button("Acessar Simulador Tributário ➡️", use_container_width=True, key="btn_simulador"):
+            st.session_state.pagina_selecionada = "🧮 Simulador Simples Nacional"
+            st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with col_card3:
+        st.markdown("""
+        <div style="background-color: #f3fcf2; padding: 25px; border-radius: 10px 10px 0px 0px; border-left: 5px solid #2e7d32; min-height: 180px; border-top: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0;">
+            <h3 style="color: #1b5e20; margin-top:0;">📋 Folha de Pagamento & Fator R</h3>
+            <p style="color: #333; font-size: 14px;">Calcule o salário líquido de funcionários para 2026 com regras de INSS/IRRF e monitore o enquadramento estratégico do Fator R.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown('<div class="custom-card-btn">', unsafe_allow_html=True)
+        if st.button("Acessar Módulo de Folha ➡️", use_container_width=True, key="btn_folha_v"):
+            st.session_state.pagina_selecionada = "📋 Módulo de Folha & Fator R"
+            st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ==============================================================================
-# TELA 2: PLANEJAMENTO TRIBUTÁRIO COMPARATIVO UNIFICADO
+# TELA 2: MÓDULO CONTÁBIL (REESTRUTURADO)
 # ==============================================================================
-elif st.session_state.pagina_selecionada == "📊 Planejamento Tributário Comparativo":
-    st.title("📊 Planejamento Tributário Comparativo (Simples x Presumido x Real)")
-    st.markdown(
-        '<span class="legal-badge">LC 123/2006 • LC 214/2025 • Dec. 12.955/2026 • LC 224/2025 • RIR/2018 • Lei 15.270/2025</span>',
-        unsafe_allow_html=True,
-    )
+elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
+    
+    # Menu interno estendido com as novas abas solicitadas
+    sub_menu = st.radio("Seções Contábeis:", [
+        "🏢 Cadastro de Empresas", "📝 Lançamentos", "⚖️ Balancete", "📊 DRE", "⚖️ Balanço Patrimonial"
+    ], horizontal=True)
 
-    tab_sim, tab_dre, tab_b2b, tab_transicao, tab_memoria = st.tabs([
-        "⚙️ Parâmetros & Comparativo",
-        "📑 DRE Comparativa",
-        "🏷️ Precificação & B2B",
-        "📅 Transição 2026–2033",
-        "⚖️ Memória de Cálculo & Base Legal",
-    ])
+    # --- ABA NOVA: CADASTRO DE EMPRESAS ---
+    if sub_menu == "🏢 Cadastro de Empresas":
+        st.title("🏢 Painel de Cadastro Corporativo")
+        
+        with st.form("form_cadastro_empresa", clear_on_submit=True):
+            st.subheader("Inserir Nova Empresa no Banco Local")
+            nome_empresa = st.text_input("Razão Social / Nome Fantasia")
+            cnpj_empresa = st.text_input("CNPJ (Apenas números ou formatado)")
+            
+            if st.form_submit_button("Salvar Empresa Definitivamente"):
+                if nome_empresa and cnpj_empresa:
+                    try:
+                        conn = conectar_db()
+                        cursor = conn.cursor()
+                        cursor.execute("INSERT INTO empresas (nome, cnpj) VALUES (?, ?)", (nome_empresa, cnpj_empresa))
+                        conn.commit()
+                        conn.close()
+                        st.success(f"Empresa '{nome_empresa}' salva com sucesso no banco relacional!")
+                        st.rerun()
+                    except sqlite3.IntegrityError:
+                        st.error("Erro: Já existe uma empresa cadastrada com este CNPJ.")
+                else:
+                    st.error("Por favor, preencha todos os campos do cadastro.")
+                    
+        st.divider()
+        st.subheader("Empresas Ativas no Sistema")
+        if not df_empresas.empty:
+            st.dataframe(df_empresas, use_container_width=True)
+        else:
+            st.info("Nenhuma empresa listada no banco local.")
 
-    with tab_sim:
-        st.subheader("1. Cenário Temporal e Reforma Tributária")
-        col_t1, col_t2, col_t3, col_t4 = st.columns(4)
-        ano_ref = col_t1.selectbox("Ano de Referência:", list(range(2026, 2034)), index=0)
-        reducao_rotulo = col_t2.selectbox("Redução IBS/CBS (LC 214/2025):", list(REDUCOES_ALIQUOTA_LC214.keys()))
-        cbs_ref = col_t3.number_input("CBS Referência (%):", min_value=0.0, max_value=25.0, value=8.80, step=0.1) / 100.0
-        ibs_ref = col_t4.number_input("IBS Referência (%):", min_value=0.0, max_value=30.0, value=17.70, step=0.1) / 100.0
+    # Se o usuário tentar acessar os relatórios sem selecionar/cadastrar empresa
+    elif empresa_id_atual is None:
+        st.warning("⚠️ Atenção: Acesse primeiro a aba '🏢 Cadastro de Empresas' para registrar uma empresa antes de ver lançamentos ou gerar relatórios.")
 
-        st.subheader("2. Faturamento, Atividade e Segregação de Receitas")
-        col_f1, col_f2, col_f3 = st.columns(3)
-        fat_mes = col_f1.number_input("Faturamento Mensal (R$):", min_value=0.0, value=120000.0, step=5000.0)
-        rbt12 = col_f2.number_input("RBT12 — Receita Bruta 12 Meses (R$):", min_value=0.0, value=1440000.0, step=10000.0)
-        atividade_lp = col_f3.selectbox("Atividade (Lucro Presumido):", list(ATIVIDADES_PRESUMIDO.keys()), index=4)
+    # --- ABA: LANÇAMENTOS ---
+    elif sub_menu == "📝 Lançamentos":
+        st.title(f"📝 Livro Diário de Lançamentos")
+        st.info(f"Gravando dados na empresa: **{empresa_selecionada}** (CNPJ: {cnpj_empresa_atual})")
+        
+        st.subheader("📥 Importar Lançamentos via CSV")
+        arquivo_upload = st.file_uploader("Selecione seu arquivo CSV exportado do Excel (Separado por ponto e vírgula)", type=["csv"])
+        
+        if arquivo_upload is not None:
+            try:
+                df_importado = pd.read_csv(arquivo_upload, sep=";", encoding="utf-8-sig")
+                df_importado.columns = [col.replace("é", "e").replace("ó", "o").title() for col in df_importado.columns]
+                colunas_obrigatorias = ["Data", "Debito", "Credito", "Valor", "Historico"]
+                
+                if all(col in df_importado.columns for col in colunas_obrigatorias):
+                    if st.button("Confirmar Importação de Dados"):
+                        dados_novos = df_importado[colunas_obrigatorias].to_dict(orient="records")
+                        
+                        # Salva item por item vinculando a empresa ativa
+                        for item in dados_novos:
+                            salvar_lancamento_db(empresa_id_atual, item["Data"], item["Debito"], item["Credito"], item["Valor"], item["Historico"])
+                            
+                        st.success(f"{len(dados_novos)} lançamentos importados e vinculados à empresa '{empresa_selecionada}'!")
+                        st.rerun()
+                else:
+                    st.error("Erro: O arquivo precisa conter as colunas: Data, Debito, Credito, Valor, Historico.")
+            except Exception as e:
+                st.error(f"Erro ao processar o arquivo: {e}")
+                
+        st.divider()
 
-        col_s1, col_s2, col_s3, col_s4 = st.columns(4)
-        anexo_sn = col_s1.selectbox("Anexo Base (Simples Nacional):", list(TABELAS_SIMPLES_NACIONAL.keys()), index=2)
-        sujeito_fr = col_s2.checkbox("Atividade sujeita ao Fator R?", value=("Anexo III" in anexo_sn or "Anexo V" in anexo_sn))
-        aliq_icms_iss = col_s3.number_input("Alíquota Efetiva ICMS/ISS (%):", min_value=0.0, max_value=25.0, value=5.0, step=0.5) / 100.0
-        opcao_iva_sn = col_s4.checkbox(
-            "Simples c/ IBS/CBS por fora (2027+)",
-            value=False,
-            disabled=(ano_ref < 2027),
-            help="Opção semestral prevista no Art. 40-C e 40-D da Res. CGSN nº 190/2026 (vigência 01/01/2027).",
-        )
-
-        with st.expander("📦 Segregação de Receitas no Simples Nacional (Art. 25 Res. CGSN nº 140/2018)", expanded=False):
-            c_seg1, c_seg2, c_seg3 = st.columns(3)
-            rec_exp = c_seg1.number_input("Exportação para o Exterior (R$/mês):", min_value=0.0, value=0.0, step=1000.0)
-            rec_st = c_seg2.number_input("Receita c/ ICMS-ST / PIS-COFINS Monofásico (R$/mês):", min_value=0.0, value=0.0, step=1000.0)
-            rec_iss_ret = c_seg3.number_input("Serviços c/ ISS Retido na Fonte (R$/mês):", min_value=0.0, value=0.0, step=1000.0)
-
-        st.subheader("3. Custos, Despesas, Folha e Insumos")
-        col_c1, col_c2, col_c3, col_c4 = st.columns(4)
-        cmv_csp = col_c1.number_input("CMV / Custo dos Serviços (R$/mês):", min_value=0.0, value=25000.0, step=1000.0)
-        desp_op = col_c2.number_input("Despesas Operacionais Dedutíveis (R$/mês):", min_value=0.0, value=18000.0, step=1000.0)
-        insumos_cred = col_c3.number_input("Compras/Insumos c/ Direito a Crédito (R$/mês):", min_value=0.0, value=25000.0, step=1000.0)
-        folha_sal = col_c4.number_input("Folha de Salários (R$/mês):", min_value=0.0, value=20000.0, step=1000.0)
-
-        col_c5, col_c6, col_c7, col_c8 = st.columns(4)
-        pro_labore = col_c5.number_input("Pró-Labore (R$/mês):", min_value=0.0, value=10000.0, step=500.0)
-        informar_folha_12m = col_c6.checkbox("Informar Folha+Encargos 12m real?", value=False)
-        folha_12m_val = (
-            col_c6.number_input("Folha+Encargos 12m (R$):", min_value=0.0, value=(folha_sal + pro_labore) * 12.0, step=5000.0)
-            if informar_folha_12m
-            else None
-        )
-        rat_fap = col_c7.number_input("RAT Ajustado pelo FAP (%):", min_value=0.5, max_value=6.0, value=2.0, step=0.5) / 100.0
-        terceiros = col_c8.number_input("Terceiros / Sistema S (%):", min_value=0.0, max_value=10.0, value=5.8, step=0.1) / 100.0
-
-        with st.expander("📘 Ajustes do Lucro Real (LALUR/LACS), Trava 30% e Incentivos LC 224/2025", expanded=False):
-            c_lr1, c_lr2, c_lr3 = st.columns(3)
-            adicoes = c_lr1.number_input("Adições ao LAIR (R$/mês):", min_value=0.0, value=0.0, step=500.0, help="Despesas não dedutíveis: brindes, multas punitivas, provisões não dedutíveis, MEP negativo.")
-            exclusoes = c_lr2.number_input("Exclusões do LAIR (R$/mês):", min_value=0.0, value=0.0, step=500.0, help="Dividendos recebidos, MEP positivo, reversão de provisões.")
-            lei_bem = c_lr3.number_input("Exclusão Lei do Bem — P&D (R$/mês):", min_value=0.0, value=0.0, step=500.0, help="Preservada em 100% pela LC nº 224/2025.")
-            c_lr4, c_lr5, c_lr6 = st.columns(3)
-            prej_fiscal = c_lr4.number_input("Prejuízo Fiscal Acumulado (R$):", min_value=0.0, value=0.0, step=5000.0, help="Compensação limitada a 30% do lucro ajustado (Lei nº 9.065/1995).")
-            base_neg_csll = c_lr5.number_input("Base Negativa CSLL Acumulada (R$):", min_value=0.0, value=0.0, step=5000.0)
-            incentivos_pat = c_lr6.number_input("Incentivos IRPJ — PAT/Cultura (R$/mês):", min_value=0.0, value=0.0, step=200.0, help="Teto reduzido em 10% pela LC nº 224/2025 (de 4% para 3,6% do IRPJ normal).")
-            inst_fin = st.checkbox("Instituição Financeira / Equiparada (CSLL 22% — EC 103/2019)?", value=False)
-
-        with st.expander("💰 Distribuição de Lucros e Dividendos — Regras 2026+ (Lei nº 15.270/2025)", expanded=True):
-            c_d1, c_d2, c_d3 = st.columns(3)
-            dist_lucros = c_d1.number_input("Distribuição Mensal por Sócio (R$):", min_value=0.0, value=0.0, step=5000.0)
-            socio_tipo = c_d2.selectbox("Perfil do Sócio Beneficiário:", ["Pessoa Física Residente", "Pessoa Jurídica"])
-            aplicar_sn_15270 = c_d3.checkbox(
-                "Aplicar retenção de 10% no Simples Nacional?",
-                value=True,
-                help="Há controvérsia jurídica frente ao Art. 14 da LC nº 123/2006. Desmarque para simular liminar/tese de isenção.",
-            )
-
-        params = ParametrosSimulacao(
-            faturamento_mes=fat_mes,
-            rbt12=rbt12,
-            atividade_presumido=atividade_lp,
-            anexo_simples=anexo_sn,
-            sujeito_fator_r=sujeito_fr,
-            cmv_csp_mes=cmv_csp,
-            despesas_op_dedutiveis_mes=desp_op,
-            insumos_com_credito_mes=insumos_cred,
-            folha_salarios_mes=folha_sal,
-            pro_labore_mes=pro_labore,
-            folha_encargos_12m=folha_12m_val,
-            rat_fap_pct=rat_fap,
-            terceiros_pct=terceiros,
-            receita_exportacao_mes=rec_exp,
-            receita_st_monofasico_mes=rec_st,
-            receita_iss_retido_mes=rec_iss_ret,
-            ano_referencia=ano_ref,
-            aliq_icms_iss_media=aliq_icms_iss,
-            cbs_ref_pct=cbs_ref,
-            ibs_ref_pct=ibs_ref,
-            reducao_iva_rotulo=reducao_rotulo,
-            simples_opcao_iva_por_fora=opcao_iva_sn,
-            adicoes_mes=adicoes,
-            exclusoes_mes=exclusoes,
-            lei_do_bem_exclusao_mes=lei_bem,
-            prejuizo_fiscal_acumulado=prej_fiscal,
-            base_negativa_csll_acumulada=base_neg_csll,
-            incentivos_fiscais_irpj_mes=incentivos_pat,
-            instituicao_financeira=inst_fin,
-            distribuicao_lucros_mes=dist_lucros,
-            socio_tipo=socio_tipo,
-            aplicar_retencao_simples_15270=aplicar_sn_15270,
-        )
-
-        resultado = executar_simulacao_completa(params)
-        sn = resultado["simples_nacional"]
-        lp = resultado["lucro_presumido"]
-        lr = resultado["lucro_real"]
-
-        for al in resultado["alertas"]:
-            if al["nivel"] == "erro":
-                st.error(f"⛔ **{al['titulo']}**: {al['mensagem']}")
-            elif al["nivel"] == "alerta_legal":
-                st.warning(f"⚖️ **{al['titulo']}**: {al['mensagem']}")
-            else:
-                st.info(f"ℹ️ **{al['titulo']}**: {al['mensagem']}")
+        with st.form("form_lancamento", clear_on_submit=True):
+            col1, col2 = st.columns(2)
+            data = col1.date_input("Data do Lançamento")
+            valor = col2.number_input("Valor (R$)", min_value=0.01, format="%.2f")
+            
+            c_debito = st.selectbox("Conta Débito (Entrada)", list(plano_de_contas.keys()), format_func=lambda x: f"{x} - {plano_de_contas[x]}")
+            c_credito = st.selectbox("Conta Crédito (Origem)", list(plano_de_contas.keys()), format_func=lambda x: f"{x} - {plano_de_contas[x]}")
+            historico = st.text_input("Histórico / Descrição da Operação")
+            
+            if st.form_submit_button("Confirmar e Salvar Lançamento"):
+                salvar_lancamento_db(empresa_id_atual, data, c_debito, c_credito, valor, historico)
+                st.success("Lançamento gravado com sucesso no banco relacional definitivo!")
+                st.rerun()
 
         st.divider()
-        st.subheader("⚖️ Resumo Comparativo de Carga Tributária")
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Regime Mais Econômico", resultado["regime_vencedor"])
-        m2.metric(
-            "Simples Nacional",
-            formatar_br(sn["total_tributos"]) if sn["elegivel"] else "Inelegível (>4,8M)",
-            f"{sn['aliquota_efetiva_global_pct']:.2f}%",
-        )
-        m3.metric(
-            "Lucro Presumido",
-            formatar_br(lp["total_tributos"]) if lp["elegivel"] else "Inelegível (>78M)",
-            f"{lp['aliquota_efetiva_global_pct']:.2f}%",
-        )
-        m4.metric("Lucro Real", formatar_br(lr["total_tributos"]), f"{lr['aliquota_efetiva_global_pct']:.2f}%")
+        st.subheader("📋 Registros Efetuados")
+        if len(st.session_state.livro_diario) > 0:
+            df_diario = pd.DataFrame(st.session_state.livro_diario)
+            df_exibicao = df_diario.copy()
+            df_exibicao.columns = ["Nº Lançamento", "Data", "Débito", "Crédito", "Valor", "Histórico"]
+            
+            if "Valor" in df_exibicao.columns:
+                df_exibicao["Valor"] = df_exibicao["Valor"].apply(formatar_br)
+            st.dataframe(df_exibicao, use_container_width=True)
+            
+            csv = df_diario.to_csv(index=False, sep=";", encoding="utf-8-sig").encode('utf-8-sig')
+            st.download_button("📤 Exportar Lançamentos para Excel/CSV", data=csv, file_name=f"lancamentos_{empresa_selecionada}.csv", mime="text/csv")
+        else:
+            st.info("Nenhum lançamento armazenado na nuvem/banco para esta empresa.")
 
-        df_comp = pd.DataFrame(
-            [
-                {
-                    "Regime": "Simples Nacional" + ("" if sn["elegivel"] else " (Vedado)"),
-                    "Tributos s/ Venda / DAS": formatar_br(sn["das"] + sn["cbs_fora"] + sn["ibs_fora"] + sn["icms_iss_fora"]),
-                    "IRPJ + CSLL": "Incluso no DAS",
-                    "CPP Patronal (Fora)": formatar_br(sn["cpp_fora"]),
-                    "IRRF Dividendos": formatar_br(sn["irrf_dividendos"]),
-                    "Carga Total": formatar_br(sn["total_tributos"]),
-                    "Alíq. Efetiva": f"{sn['aliquota_efetiva_global_pct']:.2f}%",
-                },
-                {
-                    "Regime": "Lucro Presumido" + ("" if lp["elegivel"] else " (Vedado)"),
-                    "Tributos s/ Venda / DAS": formatar_br(lp["consumo"]["total_consumo"]),
-                    "IRPJ + CSLL": formatar_br(lp["irpj"] + lp["csll"]),
-                    "CPP Patronal (Fora)": formatar_br(lp["cpp_patronal"]),
-                    "IRRF Dividendos": formatar_br(lp["irrf_dividendos"]),
-                    "Carga Total": formatar_br(lp["total_tributos"]),
-                    "Alíq. Efetiva": f"{lp['aliquota_efetiva_global_pct']:.2f}%",
-                },
-                {
-                    "Regime": "Lucro Real",
-                    "Tributos s/ Venda / DAS": formatar_br(lr["consumo"]["total_consumo"]),
-                    "IRPJ + CSLL": formatar_br(lr["irpj"] + lr["csll"]),
-                    "CPP Patronal (Fora)": formatar_br(lr["cpp_patronal"]),
-                    "IRRF Dividendos": formatar_br(lr["irrf_dividendos"]),
-                    "Carga Total": formatar_br(lr["total_tributos"]),
-                    "Alíq. Efetiva": f"{lr['aliquota_efetiva_global_pct']:.2f}%",
-                },
-            ]
-        )
-        st.dataframe(df_comp, use_container_width=True, hide_index=True)
+   # --- ABA NOVA: BALANCETE DE VERIFICAÇÃO ---
+    elif sub_menu == "⚖️ Balancete":
+        st.title("⚖️ Balancete de Verificação")
+        st.write(f"Empresa: **{empresa_selecionada}** | CNPJ: {cnpj_empresa_atual}")
+        
+        balancete_dados = []
+        tot_deb = 0
+        tot_cred = 0
+        
+        conn = conectar_db()
+        df_l = pd.read_sql_query("SELECT * FROM lancamentos WHERE empresa_id = ?", conn, params=(int(empresa_id_atual),))
+        conn.close()
 
-        # Exportação do Relatório HTML Executivo
-        params_rel = {
-            "Ano de Referência": str(ano_ref),
-            "Faturamento Mensal": formatar_br(fat_mes),
-            "RBT12": formatar_br(rbt12),
-            "Atividade (Presumido)": atividade_lp,
-            "Anexo Efetivo (Simples)": f"{sn['anexo_efetivo']} (Fator R: {sn['fator_r']*100:.2f}%)",
-            "Distribuição de Lucros": formatar_br(dist_lucros),
-        }
-        dados_rel = [list(row.values()) for row in df_comp.to_dict(orient="records")]
-        mem_sn_rel = {
-            "Alíquota Nominal / PD": f"{sn['aliquota_nominal_pct']:.2f}% / {formatar_br(sn['parcela_deduzir'])}",
-            "Alíquota Efetiva DAS": f"{sn['aliquota_efetiva_das_pct']:.2f}%",
-            "DAS Apurado": formatar_br(sn["das"]),
-            "CPP Fora (Anexo IV)": formatar_br(sn["cpp_fora"]),
-        }
-        mem_lp_rel = {
-            "Presunção Base IRPJ/CSLL": f"{lp['presuncao_irpj_base_pct']:.1f}% / {lp['presuncao_csll_base_pct']:.1f}%",
-            "Parcela Majorada LC 224 (>5M/ano)": formatar_br(lp["parcela_majorada_lc224"]),
-            "IRPJ / CSLL": f"{formatar_br(lp['irpj'])} / {formatar_br(lp['csll'])}",
-            "Consumo + CPP": f"{formatar_br(lp['consumo']['total_consumo'])} + {formatar_br(lp['cpp_patronal'])}",
-        }
-        mem_lr_rel = {
-            "LAIR Contábil": formatar_br(lr["lair"]),
-            "Adições / Exclusões": f"{formatar_br(lr['adicoes'])} / {formatar_br(lr['exclusoes'])}",
-            "Compensação Prejuízo (30%)": formatar_br(lr["compensacao_prejuizo_irpj"]),
-            "IRPJ / CSLL": f"{formatar_br(lr['irpj'])} / {formatar_br(lr['csll'])}",
-        }
-        html_rel = gerar_relatorio_html(
-            "Relatório Estratégico de Planejamento Tributário Comparativo",
-            params_rel,
-            list(df_comp.columns),
-            dados_rel,
-            mem_lp_rel,
-            mem_lr_rel,
-            mem_sn_rel,
-            f"O regime <strong>{resultado['regime_vencedor']}</strong> apresenta a menor carga tributária total de <strong>{formatar_br(resultado['menor_carga_total'])}</strong>/mês.",
-            f"Cenário {ano_ref} — {lp['consumo']['fase']}.",
-            resultado["alertas"],
-        )
-        b64_rel = base64.b64encode(html_rel.encode("utf-8")).decode("utf-8")
-        st.markdown(
-            f'<a href="data:text/html;charset=utf-8;base64,{b64_rel}" download="Relatorio_Planejamento_Tributario_{ano_ref}.html" '
-            'style="display:inline-block;background:#0f2a4a;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;">'
-            '🖨️ Baixar Relatório Executivo Completo (HTML)</a>',
-            unsafe_allow_html=True,
-        )
+        for cod, nome in plano_de_contas.items():
+            debito_acumulado = df_l[df_l['debito'] == cod]['valor'].sum()
+            credito_acumulado = df_l[df_l['credito'] == cod]['valor'].sum()
+            
+            if cod.startswith(('1', '5', '6')):
+                saldo_final = debito_acumulado - credito_acumulado
+            else:
+                saldo_final = credito_acumulado - debito_acumulado
+                
+            if debito_acumulado > 0 or credito_acumulado > 0:
+                tot_deb += debito_acumulado
+                tot_cred += credito_acumulado
+                balancete_dados.append({
+                    "Código": cod,
+                    "Conta Contábil": nome,
+                    "Débito": debito_acumulado,
+                    "Crédito": credito_acumulado,
+                    "Saldo Final": saldo_final
+                })
+        
+        if balancete_dados:
+            df_balancete_print = pd.DataFrame(balancete_dados)
+            
+            # Exibição na tela (Formatada para o usuário)
+            df_tela = df_balancete_print.copy()
+            df_tela["Débito"] = df_tela["Débito"].apply(formatar_br)
+            df_tela["Crédito"] = df_tela["Crédito"].apply(formatar_br)
+            df_tela["Saldo Final"] = df_tela["Saldo Final"].apply(formatar_br)
+            st.table(df_tela)
+            
+            # --- GERADOR DE PDF PROFISSIONAL COM REPORTLAB ---
+            from io import BytesIO
+            from reportlab.lib.pagesizes import letter
+            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib import colors
 
-    with tab_dre:
-        st.subheader("📑 DRE Gerencial Comparativa (Mensal)")
-        dre_rows = resultado["dre_comparativa"]
-        linhas_dre = [k for k in dre_rows[0].keys() if k != "Regime"]
-        tabela_dre = []
-        for linha in linhas_dre:
-            row_dict = {"Conta / Estrutura": linha}
-            for r in dre_rows:
-                val = r[linha]
-                row_dict[r["Regime"]] = f"{val:.2f}%" if "Margem" in linha else formatar_br(val)
-            tabela_dre.append(row_dict)
-        st.dataframe(pd.DataFrame(tabela_dre), use_container_width=True, hide_index=True)
+            buffer = BytesIO()
+            doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
+            story = []
+            styles = getSampleStyleSheet()
+            
+            # Estilos personalizados
+            titulo_style = ParagraphStyle('TituloStyle', parent=styles['Heading1'], fontSize=18, textColor=colors.HexColor('#0f2a4a'), alignment=1, spaceAfter=5)
+            sub_style = ParagraphStyle('SubStyle', parent=styles['Normal'], fontSize=11, textColor=colors.HexColor('#555555'), alignment=1, spaceAfter=15)
+            texto_style = ParagraphStyle('TextoStyle', parent=styles['Normal'], fontSize=10, textColor=colors.black)
+            header_tabela = ParagraphStyle('HeaderTabela', parent=styles['Normal'], fontSize=10, textColor=colors.white, fontName='Helvetica-Bold')
 
-    with tab_b2b:
-        st.subheader("🏷️ Precificação Alvo & Competitividade B2B")
-        margem_desejada = st.slider("Margem Líquida Alvo (%):", min_value=5, max_value=50, value=20, step=1) / 100.0
-        from tax_engine import calcular_precificacao_e_b2b
-
-        b2b_calc = calcular_precificacao_e_b2b(params, sn, lp, lr, margem_desejada)
-        df_b2b = pd.DataFrame(
-            [
-                {
-                    "Regime": reg,
-                    "Carga Tributária Efetiva": f"{dados['carga_tributaria_pct']:.2f}%",
-                    "Faturamento Necessário p/ Margem Alvo": formatar_br(dados["faturamento_necessario_margem_alvo"]),
-                    "Crédito Tributário Transferido ao Cliente B2B": f"{dados['credito_transferido_b2b_pct']:.2f}%",
-                }
-                for reg, dados in b2b_calc.items()
-            ]
-        )
-        st.dataframe(df_b2b, use_container_width=True, hide_index=True)
-        st.caption(
-            "Nota Legal: No Simples Nacional Unificado, o adquirente não optante apropria crédito de IBS/CBS limitado ao "
-            "montante cobrado no DAS (Art. 49, II, Dec. nº 12.955/2026 e Art. 58, § 4º, Res. CGSN nº 190/2026)."
-        )
-
-    with tab_transicao:
-        st.subheader("📅 Projeção da Transição Tributária (2026–2033)")
-        linhas_t = []
-        for ano in range(2026, 2034):
-            p_ano = ParametrosSimulacao(**{**params.__dict__, "ano_referencia": ano})
-            res_ano = executar_simulacao_completa(p_ano)
-            linhas_t.append(
-                {
-                    "Ano": ano,
-                    "Fase Legal": CRONOGRAMA_TRANSICAO_IVA[ano]["fase"],
-                    "Simples Nacional": formatar_br(res_ano["simples_nacional"]["total_tributos"]),
-                    "Lucro Presumido": formatar_br(res_ano["lucro_presumido"]["total_tributos"]),
-                    "Lucro Real": formatar_br(res_ano["lucro_real"]["total_tributos"]),
-                    "Melhor Regime": res_ano["regime_vencedor"],
-                }
+            # Cabeçalho do PDF
+            story.append(Paragraph("<b>MAXSUEL GESTÃO CONTÁBIL & ESTRATÉGICA</b>", titulo_style))
+            story.append(Paragraph(f"BALANCETE DE VERIFICAÇÃO INTEGRAL — {datetime.now().strftime('%d/%m/%Y %H:%M')}", sub_style))
+            story.append(Paragraph(f"<b>Empresa:</b> {empresa_selecionada} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <b>CNPJ:</b> {cnpj_empresa_atual}", texto_style))
+            story.append(Spacer(1, 15))
+            
+            # Dados da tabela para o PDF
+            data_pdf = [[Paragraph("<b>Código</b>", header_tabela), Paragraph("<b>Conta Contábil</b>", header_tabela), Paragraph("<b>Débito</b>", header_tabela), Paragraph("<b>Crédito</b>", header_tabela), Paragraph("<b>Saldo Final</b>", header_tabela)]]
+            
+            for row in balancete_dados:
+                data_pdf.append([
+                    Paragraph(row["Código"], texto_style),
+                    Paragraph(row["Conta Contábil"], texto_style),
+                    Paragraph(formatar_br(row["Débito"]), texto_style),
+                    Paragraph(formatar_br(row["Crédito"]), texto_style),
+                    Paragraph(formatar_br(row["Saldo Final"]), texto_style)
+                ])
+            
+            # Adiciona linha de totais no PDF
+            data_pdf.append([Paragraph("", texto_style), Paragraph("<b>TOTALIZADORES:</b>", texto_style), Paragraph(f"<b>{formatar_br(tot_deb)}</b>", texto_style), Paragraph(f"<b>{formatar_br(tot_cred)}</b>", texto_style), Paragraph("", texto_style)])
+            
+            t = Table(data_pdf, colWidths=[50, 200, 100, 100, 100])
+            t.setStyle(TableStyle([
+                ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#0f2a4a')),
+                ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+                ('BOTTOMPADDING', (0,0), (-1,0), 8),
+                ('BACKGROUND', (0,1), (-1,-2), colors.HexColor('#f8fafc')),
+                ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
+                ('ROWBACKGROUNDS', (0,1), (-1,-2), [colors.white, colors.HexColor('#f1f5f9')]), # Linhas zebradas
+                ('BACKGROUND', (0,-1), (-1,-1), colors.HexColor('#e2e8f0')), # Cor da linha de totais
+            ]))
+            story.append(t)
+            doc.build(story)
+            
+            pdf_bytes = buffer.getvalue()
+            buffer.close()
+            
+            # Botão de Download Oficial
+            st.download_button(
+                label="📥 Baixar PDF para Impressão",
+                data=pdf_bytes,
+                file_name=f"Balancete_{empresa_selecionada.replace(' ', '_')}.pdf",
+                mime="application/pdf",
+                use_container_width=True
             )
-        st.dataframe(pd.DataFrame(linhas_t), use_container_width=True, hide_index=True)
+        else:
+            st.info("Sem movimentações financeiras para gerar o Balancete.")
 
-    with tab_memoria:
-        st.subheader("⚖️ Memória de Cálculo e Fundamentação Normativa")
-        with st.expander("1. Simples Nacional", expanded=True):
-            st.write(f"**Anexo Aplicado:** {sn['anexo_efetivo']} (Faixa {sn['faixa']})")
-            st.write(f"**Fator R Apurado:** {sn['fator_r']*100:.2f}% | **Alíquota Efetiva DAS:** {sn['aliquota_efetiva_das_pct']:.4f}%")
-            st.write(f"**Fundamentação:** {sn['base_legal']}")
-        with st.expander("2. Lucro Presumido", expanded=True):
-            st.write(f"**Presunção Base:** {lp['presuncao_irpj_base_pct']:.1f}% IRPJ / {lp['presuncao_csll_base_pct']:.1f}% CSLL")
-            st.write(f"**Parcela Normal / Majorada LC 224 (+10% > R$ 5M/ano):** {formatar_br(lp['parcela_normal'])} / {formatar_br(lp['parcela_majorada_lc224'])}")
-            st.write(f"**Base IRPJ / Base CSLL:** {formatar_br(lp['base_irpj'])} / {formatar_br(lp['base_csll'])}")
-            st.write(f"**Fundamentação:** {lp['base_legal']}")
-        with st.expander("3. Lucro Real", expanded=True):
-            st.write(f"**LAIR:** {formatar_br(lr['lair'])} | **Lucro Real Tributável:** {formatar_br(lr['lucro_real_tributavel'])}")
-            st.write(f"**Compensação Prejuízo Fiscal (Trava 30%):** {formatar_br(lr['compensacao_prejuizo_irpj'])}")
-            st.write(f"**Incentivo Aplicado (Limite 3,6% LC 224/2025):** {formatar_br(lr['incentivo_aplicado_lc224'])}")
-            st.write(f"**Fundamentação:** {lr['base_legal']}")
+    # --- ABA: DRE ---
+    elif sub_menu == "📊 DRE":
+        st.title("📊 Demonstrativo de Resultado do Exercício (DRE)")
+        st.write(f"Empresa: **{empresa_selecionada}**")
+        
+        st.metric("LUCRO LÍQUIDO DO PERÍODO", formatar_br(lucro))
+        
+        lista_dre = [
+            {"Estrutura Contábil": "Receita Bruta de Vendas (4.01)", "Valor": saldos.get("4.01", 0.0)},
+            {"Estrutura Contábil": "(-) Despesas Operacionais (5.01)", "Valor": -saldos.get("5.01", 0.0)},
+            {"Estrutura Contábil": "(-) Distribuição de Dividendos (5.02)", "Valor": -saldos.get("5.02", 0.0)},
+            {"Estrutura Contábil": "(-) Impostos Incidentes (6.x)", "Valor": -saldos.get("6.01", 0.0)},
+            {"Estrutura Contábil": "(=) RESULTADO LÍQUIDO (ARE)", "Valor": lucro}
+        ]
+        
+        df_dre = pd.DataFrame([{"Estrutura Contábil": item["Estrutura Contábil"], "Valor": formatar_br(item["Valor"])} for item in lista_dre])
+        st.table(df_dre)
+        
+        # Gerador PDF da DRE
+        from io import BytesIO
+        from reportlab.lib.pagesizes import letter
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib import colors
 
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
+        story = []
+        styles = getSampleStyleSheet()
+        
+        titulo_style = ParagraphStyle('TituloDRE', parent=styles['Heading1'], fontSize=18, textColor=colors.HexColor('#0f2a4a'), alignment=1, spaceAfter=5)
+        sub_style = ParagraphStyle('SubDRE', parent=styles['Normal'], fontSize=11, textColor=colors.HexColor('#555555'), alignment=1, spaceAfter=20)
+        texto_style = ParagraphStyle('TextoDRE', parent=styles['Normal'], fontSize=11, textColor=colors.black)
+        header_style = ParagraphStyle('HeaderDRE', parent=styles['Normal'], fontSize=11, textColor=colors.white, fontName='Helvetica-Bold')
+
+        story.append(Paragraph("<b>MAXSUEL GESTÃO CONTÁBIL & ESTRATÉGICA</b>", titulo_style))
+        story.append(Paragraph(f"DEMONSTRATIVO DE RESULTADO DO EXERCÍCIO (DRE)", sub_style))
+        story.append(Paragraph(f"<b>Empresa:</b> {empresa_selecionada} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <b>CNPJ:</b> {cnpj_empresa_atual}", texto_style))
+        story.append(Spacer(1, 15))
+        
+        data_pdf = [[Paragraph("<b>Estrutura Contábil</b>", header_style), Paragraph("<b>Valor Corrente</b>", header_style)]]
+        for row in lista_dre:
+            data_pdf.append([Paragraph(row["Estrutura Contábil"], texto_style), Paragraph(formatar_br(row["Valor"]), texto_style)])
+            
+        t = Table(data_pdf, colWidths=[350, 150])
+        t.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#0f2a4a')),
+            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
+            ('ROWBACKGROUNDS', (0,1), (-1,-2), [colors.white, colors.HexColor('#f8fafc')]),
+            ('BACKGROUND', (0,-1), (-1,-1), colors.HexColor('#e2e8f0')), # Linha do Resultado Líquido em Destaque
+            ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+            ('TOPPADDING', (0,0), (-1,-1), 8),
+        ]))
+        story.append(t)
+        doc.build(story)
+        pdf_bytes = buffer.getvalue()
+        buffer.close()
+        
+        st.download_button(
+            label="📥 Baixar DRE em PDF Comercial",
+            data=pdf_bytes,
+            file_name=f"DRE_{empresa_selecionada.replace(' ', '_')}.pdf",
+            mime="application/pdf",
+            use_container_width=True
+        )
+
+    # --- ABA: BALANÇO PATRIMONIAL ---
+    elif sub_menu == "⚖️ Balanço Patrimonial":
+        st.title("⚖️ Balanço Patrimonial Consolidado")
+        st.write(f"Empresa: **{empresa_selecionada}**")
+        
+        saldos_bp = saldos.copy()
+        saldos_bp["2.05"] = saldos_bp.get("2.05", 0.0) + lucro  
+        col_a, col_p = st.columns(2)
+        
+        ativo_data = [{"Conta": n, "Valor": saldos_bp.get(c, 0.0)} for c, n in plano_de_contas.items() if c.startswith('1')]
+        total_ativo = sum(saldos_bp.get(c, 0.0) for c in plano_de_contas if c.startswith('1'))
+        
+        passivo_data = [{"Conta": n, "Valor": saldos_bp.get(c, 0.0)} for c, n in plano_de_contas.items() if c.startswith('2')]
+        total_passivo = sum(saldos_bp.get(c, 0.0) for c in plano_de_contas if c.startswith('2'))
+        
+        with col_a:
+            st.subheader("🔵 ATIVO")
+            df_ativo_tela = pd.DataFrame([{"Conta": i["Conta"], "Valor": formatar_br(i["Valor"])} for i in ativo_data])
+            st.table(df_ativo_tela)
+            st.info(f"**Total do Ativo:** {formatar_br(total_ativo)}")
+            
+        with col_p:
+            st.subheader("🟡 PASSIVO + PL")
+            df_passivo_tela = pd.DataFrame([{"Conta": i["Conta"], "Valor": formatar_br(i["Valor"])} for i in passivo_data])
+            st.table(df_passivo_tela)
+            st.info(f"**Total do Passivo + PL:** {formatar_br(total_passivo)}")
+            
+        # Gerador PDF do Balanço Patrimonial (Lado a Lado ou em blocos limpos)
+        from io import BytesIO
+        from reportlab.lib.pagesizes import letter
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib import colors
+
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
+        story = []
+        styles = getSampleStyleSheet()
+        
+        titulo_style = ParagraphStyle('TituloBP', parent=styles['Heading1'], fontSize=18, textColor=colors.HexColor('#0f2a4a'), alignment=1, spaceAfter=5)
+        sub_style = ParagraphStyle('SubBP', parent=styles['Normal'], fontSize=11, textColor=colors.HexColor('#555555'), alignment=1, spaceAfter=20)
+        texto_style = ParagraphStyle('TextoBP', parent=styles['Normal'], fontSize=10, textColor=colors.black)
+        header_style = ParagraphStyle('HeaderBP', parent=styles['Normal'], fontSize=10, textColor=colors.white, fontName='Helvetica-Bold')
+
+        story.append(Paragraph("<b>MAXSUEL GESTÃO CONTÁBIL & ESTRATÉGICA</b>", titulo_style))
+        story.append(Paragraph(f"BALANÇO PATRIMONIAL CONSOLIDADO", sub_style))
+        story.append(Paragraph(f"<b>Empresa:</b> {empresa_selecionada} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <b>CNPJ:</b> {cnpj_empresa_atual}", texto_style))
+        story.append(Spacer(1, 15))
+        
+        # Montagem das duas colunas de dados para estruturar o PDF de forma profissional
+        dados_ativos_pdf = [[Paragraph("<b>Conta (ATIVO)</b>", header_style), Paragraph("<b>Valor</b>", header_style)]]
+        for item in ativo_data:
+            dados_ativos_pdf.append([Paragraph(item["Conta"], texto_style), Paragraph(formatar_br(item["Valor"]), texto_style)])
+        dados_ativos_pdf.append([Paragraph("<b>TOTAL DO ATIVO</b>", texto_style), Paragraph(f"<b>{formatar_br(total_ativo)}</b>", texto_style)])
+        
+        dados_passivos_pdf = [[Paragraph("<b>Conta (PASSIVO + PL)</b>", header_style), Paragraph("<b>Valor</b>", header_style)]]
+        for item in passivo_data:
+            dados_passivos_pdf.append([Paragraph(item["Conta"], texto_style), Paragraph(formatar_br(item["Valor"]), texto_style)])
+        dados_passivos_pdf.append([Paragraph("<b>TOTAL PASSIVO + PL</b>", texto_style), Paragraph(f"<b>{formatar_br(total_passivo)}</b>", texto_style)])
+        
+        # Equaliza o tamanho das tabelas para o PDF não quebrar as linhas
+        max_len = max(len(dados_ativos_pdf), len(dados_passivos_pdf))
+        while len(dados_ativos_pdf) < max_len:
+            dados_ativos_pdf.insert(-1, [Paragraph("-", texto_style), Paragraph("-", texto_style)])
+        while len(dados_passivos_pdf) < max_len:
+            dados_passivos_pdf.insert(-1, [Paragraph("-", texto_style), Paragraph("-", texto_style)])
+            
+        # Une as tabelas lado a lado no arquivo
+        tabela_mestra_dados = []
+        for i in range(max_len):
+            tabela_mestra_dados.append(dados_ativos_pdf[i] + dados_passivos_pdf[i])
+            
+        t_bp = Table(tabela_mestra_dados, colWidths=[170, 95, 170, 95])
+        t_bp.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (1,0), colors.HexColor('#0f2a4a')), # Header Ativo
+            ('BACKGROUND', (2,0), (3,0), colors.HexColor('#d4af37')), # Header Passivo (Dourado/Amarelo do seu padrão)
+            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
+            ('BACKGROUND', (0,-1), (1,-1), colors.HexColor('#e2e8f0')), # Totais Ativo
+            ('BACKGROUND', (2,-1), (3,-1), colors.HexColor('#e2e8f0')), # Totais Passivo
+            ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+            ('TOPPADDING', (0,0), (-1,-1), 6),
+        ]))
+        
+        story.append(t_bp)
+        doc.build(story)
+        pdf_bytes = buffer.getvalue()
+        buffer.close()
+        
+        st.download_button(
+            label="📥 Baixar Balanço Patrimonial em PDF",
+            data=pdf_bytes,
+            file_name=f"Balanco_{empresa_selecionada.replace(' ', '_')}.pdf",
+            mime="application/pdf",
+            use_container_width=True
+        )
+# As outras abas estruturais do seu código ("🧮 Simulador Simples Nacional" e "📋 Módulo de Folha & Fator R") continuam logo abaixo intocadas, mantendo o funcionamento idêntico ao original.
 
 # ==============================================================================
-# TELA 3: SIMULADOR SIMPLES NACIONAL (ATUALIZADO LC 123/2006 + RES. CGSN 190/2026)
+# TELA 3: SIMULADOR DO SIMPLES NACIONAL + REFORMA TRIBUTÁRIA
 # ==============================================================================
 elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
-    st.title("🧮 Simulador do Simples Nacional (LC 123/2006 & Res. CGSN 190/2026)")
-    col1, col2, col3 = st.columns(3)
-    rbt12_sn = col1.number_input("RBT12 (R$):", min_value=0.0, value=360000.0, step=10000.0)
-    fat_sn = col2.number_input("Faturamento do Mês (R$):", min_value=0.0, value=30000.0, step=1000.0)
-    ano_sn = col3.selectbox("Ano de Apuração:", list(range(2026, 2034)), index=0)
+    st.title("🧮 Super Simulador Comparativo do Simples Nacional + Reforma Tributária")
+    
+   # --------------------------------------------------------------------------
+    # 1. ENTRADAS BÁSICAS DO SIMPLES
+    # --------------------------------------------------------------------------
+    col_in1, col_in2 = st.columns(2)
+    rbt12 = col_in1.number_input(
+        "Receita Acumulada nos últimos 12 meses (RBT12):",
+        min_value=0.00,
+        value=250000.00,
+        format="%0.2f",
+    )
+    faturamento_mes = col_in2.number_input(
+        "Faturamento Estimado para o Mês Atual:",
+        min_value=0.00,
+        value=20000.00,
+        format="%0.2f",
+    )
+    
+    # --------------------------------------------------------------------------
+    # 2. ENTRADAS DA REFORMA TRIBUTÁRIA (CBS & IBS POR FORA)
+    # --------------------------------------------------------------------------
+    with st.expander("⚙️ Parâmetros da Reforma Tributária (Apurando CBS/IBS Por Fora)", expanded=True):
+        col_ref1, col_ref2, col_ref3, col_ref4 = st.columns(4)
+        
+        cbs_ref = col_ref1.number_input("CBS Ref. (%):", min_value=0.0, max_value=30.0, value=9.21, step=0.1)
+        ibs_ref = col_ref2.number_input("IBS Ref. (%):", min_value=0.0, max_value=30.0, value=18.7, step=0.1)
+        
+        opcoes_reducao = {
+            "0% - Regra Geral (Sem Desconto)": 0.0,
+            "30% - Profissões Regulamentadas": 0.30,
+            "60% - Saúde, Educação, Agro, etc.": 0.60
+        }
+        reducao_rotulo = col_ref3.selectbox("Redução de Alíquota (LC 214):", list(opcoes_reducao.keys()))
+        reducao_pct = opcoes_reducao[reducao_rotulo]
+        
+        compras_insumos = col_ref4.number_input("Compras/Insumos c/ Crédito (Mês):", min_value=0.00, value=0.00, format="%.2f")
 
-    col4, col5, col6 = st.columns(3)
-    folha_12m_sn = col4.number_input("Folha + Encargos 12m (R$):", min_value=0.0, value=105000.0, step=5000.0)
-    insumos_sn = col5.number_input("Compras c/ Crédito IBS/CBS (R$/mês):", min_value=0.0, value=5000.0, step=500.0)
-    opcao_fora_sn = col6.checkbox("Simular Opção IBS/CBS Por Fora (2027+)", value=(ano_sn >= 2027), disabled=(ano_sn < 2027))
+    # --------------------------------------------------------------------------
+    # 3. MOTORES DE CÁLCULO
+    # --------------------------------------------------------------------------
+    tabelas_calculo = {k: list(v) for k, v in TABELAS_PADRAO.items()}
+    resultados = []
+    detalhes_impostos = {}
+    df_rateio_impressao = pd.DataFrame()  # 👈 ADICIONE ESTA LINHA AQUI!
 
-    linhas_sn = []
-    for nome_anexo in TABELAS_SIMPLES_NACIONAL:
-        p_item = ParametrosSimulacao(
-            faturamento_mes=fat_sn,
-            rbt12=rbt12_sn,
-            anexo_simples=nome_anexo,
-            sujeito_fator_r=False,
-            folha_encargos_12m=folha_12m_sn,
-            insumos_com_credito_mes=insumos_sn,
-            ano_referencia=ano_sn,
-            simples_opcao_iva_por_fora=False,
-        )
-        res_unif = calcular_simples_nacional(p_item)
-        p_fora = ParametrosSimulacao(**{**p_item.__dict__, "simples_opcao_iva_por_fora": opcao_fora_sn})
-        res_fora = calcular_simples_nacional(p_fora)
-        linhas_sn.append(
-            {
+    # Alíquotas do IBS e CBS já aplicadas as reduções de 30% ou 60%
+    aliq_cbs_efetiva = (cbs_ref / 100.0) * (1.0 - reducao_pct)
+    aliq_ibs_efetiva = (ibs_ref / 100.0) * (1.0 - reducao_pct)
+
+    # Base de cálculo do IBS/CBS Não-Cumulativo (Débito sobre vendas - Crédito sobre insumos)
+    base_liquida_insumos = max(0.0, faturamento_mes - compras_insumos)
+    cbs_por_fora = base_liquida_insumos * aliq_cbs_efetiva
+    ibs_por_fora = base_liquida_insumos * aliq_ibs_efetiva
+
+    for nome_anexo, faixas in tabelas_calculo.items():
+        rbt12_calculo = rbt12 if rbt12 > 0 else (faturamento_mes if faturamento_mes > 0 else 1.0)
+        aliquota_nominal, deducao, encontrou = 0.0, 0.0, False
+        
+        for limite, aliq, ded in faixas:
+            if rbt12_calculo <= limite:
+                aliquota_nominal = aliq
+                deducao = ded
+                encontrou = True
+                break
+        
+        if encontrou:
+            if rbt12 == 0: 
+                aliquota_efetiva = aliquota_nominal
+            else: 
+                aliquota_efetiva = ((rbt12 * aliquota_nominal) - deducao) / rbt12
+            
+            aliquota_efetiva = max(0.0, aliquota_efetiva)
+            imposto_tradicional = faturamento_mes * aliquota_efetiva
+            
+            # --- LÓGICA REFORMA TRIBUTÁRIA (EXCLUSÃO DO DAS) ---
+            rateio = REPARTICAO_IMPOSTOS[nome_anexo]
+            
+            # Soma a fatia dos tributos extintos e migrados pro IBS/CBS (PIS, COFINS, ICMS, ISS, IPI)
+            pct_substituido = sum(
+                pct for imp, pct in rateio.items() 
+                if any(t in imp.upper() for t in ["PIS", "COFINS", "ICMS", "ISS", "IPI"])
+            )
+            
+            # O DAS reduzido cobra apenas os impostos restantes (CPP, IRPJ, CSLL)
+            aliq_das_reduzido = aliquota_efetiva * (1.0 - pct_substituido)
+            das_reduzido = faturamento_mes * aliq_das_reduzido
+            
+            # Carga Tributária Total na opção "Por Fora"
+            total_por_fora = das_reduzido + cbs_por_fora + ibs_por_fora
+            diferenca = total_por_fora - imposto_tradicional
+            
+            resultados.append({
                 "Anexo": nome_anexo,
-                "Faixa": res_unif["faixa"],
-                "Alíq. Efetiva DAS": f"{res_unif['aliquota_efetiva_das_pct']:.2f}%",
-                "DAS Unificado": formatar_br(res_unif["das"]),
-                "CPP Fora (Anexo IV)": formatar_br(res_unif["cpp_fora"]),
-                "Total Unificado": formatar_br(res_unif["total_tributos"]),
-                "Total c/ IBS/CBS Fora (2027+)": formatar_br(res_fora["total_tributos"]) if (ano_sn >= 2027 and opcao_fora_sn) else "N/A (2026)",
-            }
-        )
-    st.dataframe(pd.DataFrame(linhas_sn), use_container_width=True, hide_index=True)
+                "DAS Tradicional": imposto_tradicional,
+                "DAS Reduzido": das_reduzido,
+                "CBS Por Fora": cbs_por_fora,
+                "IBS Por Fora": ibs_por_fora,
+                "Carga Total (Reforma)": total_por_fora,
+                "Diferença (R$)": diferenca
+            })
+            
+            detalhes_impostos[nome_anexo] = {imp: imposto_tradicional * pct for imp, pct in rateio.items()}
+        else:
+            resultados.append({
+                "Anexo": nome_anexo, 
+                "DAS Tradicional": 0.0, 
+                "DAS Reduzido": 0.0, 
+                "CBS Por Fora": 0.0, 
+                "IBS Por Fora": 0.0, 
+                "Carga Total (Reforma)": 0.0, 
+                "Diferença (R$)": 0.0
+            })
 
+    # --------------------------------------------------------------------------
+    # 4. PAINEL COMPARATIVO COMPLETO C/ CORES E CARDS
+    # --------------------------------------------------------------------------
+    st.subheader("📊 Painel Comparativo: Simples Unificado vs. IBS/CBS Por Fora")
+    
+    df_res = pd.DataFrame(resultados)
+    
+    # Função para colorir a coluna de Diferença
+    def colorir_diferenca(val):
+        if val > 0:
+            return 'color: #ef4444; font-weight: bold;'  # Vermelho se aumentou o imposto
+        elif val < 0:
+            return 'color: #22c55e; font-weight: bold;'  # Verde se diminuiu o imposto
+        return 'color: #6b7280;'
+
+    # Cópia formatada para exibição
+    df_res_exibir = df_res.copy()
+    colunas_moeda = ["DAS Tradicional", "DAS Reduzido", "CBS Por Fora", "IBS Por Fora", "Carga Total (Reforma)"]
+    for col in colunas_moeda:
+        df_res_exibir[col] = df_res_exibir[col].apply(formatar_br)
+
+    # Exibição da tabela com destaque de cores na Diferença
+    st.dataframe(
+        df_res_exibir.style.map(colorir_diferenca, subset=["Diferença (R$)"]).format({"Diferença (R$)": formatar_br}),
+        use_container_width=True,
+        hide_index=True
+    )
+    
+    # --------------------------------------------------------------------------
+   # --------------------------------------------------------------------------
+    # 💡 DIAGNÓSTICO ESTRATÉGICO E LAUDO FISCAL (EXIBIÇÃO NA TELA)
+    # --------------------------------------------------------------------------
+    if resultados:
+        st.divider()
+        st.subheader("💡 Diagnóstico Estratégico e Parecer Fiscal")
+        
+        # Considera o primeiro anexo da simulação para a análise do card
+        res_anexo = resultados[0] 
+        dif = res_anexo["Diferença (R$)"]
+        
+        col_c1, col_c2 = st.columns(2)
+        
+        with col_c1:
+            if dif > 0:
+                st.error(
+                    f"🔴 **Recomendação B2C (Consumidor Final):** Mantendo no **Simples Tradicional** "
+                    f"você economiza **{formatar_br(abs(dif))}** por mês no caixa da empresa em relação ao modelo por fora."
+                )
+            elif dif < 0:
+                st.success(
+                    f"🟢 **Recomendação B2C (Consumidor Final):** Optar por **Recolher Por Fora (IBS/CBS)** "
+                    f"gera uma economia mensal de **{formatar_br(abs(dif))}**!"
+                )
+            else:
+                st.info("⚖️ **Carga Equivalente:** Ambas as opções resultam no mesmo valor final de tributo.")
+                
+        with col_c2:
+            st.warning(
+                "🔵 **Estratégia B2B (Vendas para Empresas):** Apurar IBS/CBS por fora transfere **crédito integral** "
+                "para seus clientes PJ, garantindo maior apelo comercial e competitividade no mercado corporativo."
+            )
+
+    # --------------------------------------------------------------------------
+    # 5. DETALHAMENTO DO RATEIO E GRÁFICO (TELA E IMPRESSÃO)
+    # --------------------------------------------------------------------------
+    st.divider()
+    st.subheader("🔀 Detalhamento e Rateio Interno da Guia (DAS Tradicional)")
+    
+    anexo_detalhe = st.selectbox(
+        "Escolha um Anexo para analisar a decomposição do imposto:", 
+        list(TABELAS_PADRAO.keys())
+    )
+    
+    df_rateio_impressao = pd.DataFrame()
+
+    if anexo_detalhe in detalhes_impostos:
+        dict_impostos = detalhes_impostos[anexo_detalhe]
+        df_rateio = pd.DataFrame([{"Imposto": k, "Valor Destinado": v} for k, v in dict_impostos.items() if v > 0])
+        
+        df_rateio_impressao = df_rateio.copy()
+        
+        col_graf1, col_graf2 = st.columns([1, 1])
+        with col_graf1:
+            st.markdown(f"**Valores destinados por tributo ({anexo_detalhe}):**")
+            df_rateio_exibir = df_rateio.copy()
+            df_rateio_exibir["Valor Destinado"] = df_rateio_exibir["Valor Destinado"].apply(formatar_br)
+            st.table(df_rateio_exibir)
+            
+        with col_graf2:
+            st.markdown("**Distribuição Proporcional da Guia:**")
+            st.bar_chart(df_rateio.set_index("Imposto"))
+
+    # ==============================================================================
+    # EXPORTAÇÃO E IMPRESSÃO COM LOGO (HTML IMPRIMÍVEL AUTOMÁTICO)
+    # ==============================================================================
+    st.divider()
+    st.subheader("🖨️ Imprimir Simulação")
+    
+    # Prepara os dados do Diagnóstico para o HTML
+    res_anexo_imp = resultados[0] if resultados else {}
+    dif_imp = res_anexo_imp.get("Diferença (R$)", 0)
+    
+    if dif_imp > 0:
+        html_diag_b2c = f"""
+        <div style="background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 10px 14px; margin-bottom: 10px; border-radius: 4px;">
+            <b style="color: #991b1b;">🔴 Recomendação Vendas B2C (Consumidor Final):</b><br>
+            <span style="font-size: 12px; color: #7f1d1d;">Mantendo no <b>Simples Tradicional</b> a empresa economiza até <b>{formatar_br(abs(dif_imp))}</b> por mês.</span>
+        </div>
+        """
+    elif dif_imp < 0:
+        html_diag_b2c = f"""
+        <div style="background-color: #f0fdf4; border-left: 4px solid #22c55e; padding: 10px 14px; margin-bottom: 10px; border-radius: 4px;">
+            <b style="color: #166534;">🟢 Recomendação Vendas B2C (Consumidor Final):</b><br>
+            <span style="font-size: 12px; color: #14532d;">Optar por <b>Recolher Por Fora</b> gera <b>{formatar_br(abs(dif_imp))}</b> de economia mensal!</span>
+        </div>
+        """
+    else:
+        html_diag_b2c = """
+        <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 10px 14px; margin-bottom: 10px; border-radius: 4px;">
+            <b style="color: #1e40af;">⚖️ Carga Equivalente:</b><br>
+            <span style="font-size: 12px; color: #1e3a8a;">Ambas as opções geram o mesmo valor total de tributação na operação.</span>
+        </div>
+        """
+
+    html_diag_b2b = """
+    <div style="background-color: #f0f9ff; border-left: 4px solid #0284c7; padding: 10px 14px; margin-bottom: 15px; border-radius: 4px;">
+        <b style="color: #075985;">🔵 Posicionamento Estratégico Vendas B2B (Empresas):</b><br>
+        <span style="font-size: 12px; color: #0c4a6e;">Apurar IBS/CBS por fora transfere <b>crédito tributário integral</b> aos clientes PJ.</span>
+    </div>
+    """
+
+    # Linhas do Painel Comparativo para a Tabela HTML
+    html_linhas_tabela = ""
+    for r in resultados:
+        das_trad = formatar_br(r["DAS Tradicional"]) if isinstance(r["DAS Tradicional"], (int, float)) else r["DAS Tradicional"]
+        das_red = formatar_br(r["DAS Reduzido"]) if isinstance(r["DAS Reduzido"], (int, float)) else r["DAS Reduzido"]
+        cbs_v = formatar_br(r["CBS Por Fora"]) if isinstance(r["CBS Por Fora"], (int, float)) else r["CBS Por Fora"]
+        ibs_v = formatar_br(r["IBS Por Fora"]) if isinstance(r["IBS Por Fora"], (int, float)) else r["IBS Por Fora"]
+        total_v = formatar_br(r["Carga Total (Reforma)"]) if isinstance(r["Carga Total (Reforma)"], (int, float)) else r["Carga Total (Reforma)"]
+        
+        cor_dif = "#ef4444" if r["Diferença (R$)"] > 0 else ("#22c55e" if r["Diferença (R$)"] < 0 else "#333")
+        dif_v = formatar_br(r["Diferença (R$)"]) if isinstance(r["Diferença (R$)"], (int, float)) else r["Diferença (R$)"]
+        
+        html_linhas_tabela += f"""
+        <tr>
+            <td>{r['Anexo']}</td>
+            <td>{das_trad}</td>
+            <td>{das_red}</td>
+            <td>{cbs_v}</td>
+            <td>{ibs_v}</td>
+            <td><b>{total_v}</b></td>
+            <td style="color: {cor_dif}; font-weight: bold;">{dif_v}</td>
+        </tr>
+        """
+        
+    # Rateio e Gráfico em HTML para a Folha 2 da Impressão
+    html_linhas_rateio = ""
+    html_barras_grafico = ""
+    
+    if not df_rateio_impressao.empty:
+        max_valor = df_rateio_impressao["Valor Destinado"].max() if df_rateio_impressao["Valor Destinado"].max() > 0 else 1
+        
+        for idx, row in df_rateio_impressao.iterrows():
+            v_format = formatar_br(row['Valor Destinado'])
+            pct = (row['Valor Destinado'] / max_valor) * 100
+            
+            html_linhas_rateio += f"<tr><td>{row['Imposto']}</td><td><b>{v_format}</b></td></tr>"
+            
+            html_barras_grafico += f"""
+            <div style="margin-bottom: 8px;">
+                <div style="font-size: 11px; margin-bottom: 2px; color: #475569;"><b>{row['Imposto']}:</b> {v_format}</div>
+                <div style="background-color: #e2e8f0; width: 100%; height: 14px; border-radius: 3px; overflow: hidden;">
+                    <div style="background-color: #0f2a4a; width: {pct:.1f}%; height: 100%;"></div>
+                </div>
+            </div>
+            """
+
+    logo_tag = f'<img class="logo" src="data:image/png;base64,{logo_base64}">' if logo_base64 else '<h2 style="color: #0f2a4a; margin:0;">MAXSUEL CONTABILIDADE</h2>'
+    data_atual = datetime.now().strftime("%d/%m/%Y às %H:%M")
+
+    html_template = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <title>Simulação Simples Nacional + Reforma Tributária - Maxsuel Contabilidade</title>
+        <style>
+            /* FORÇA A IMPRESSÃO DE CORES DE FUNDO E GRÁFICOS */
+            * {{
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }}
+
+            body {{ font-family: 'Segoe UI', Arial, sans-serif; margin: 25px; color: #333; line-height: 1.4; }}
+            .header {{ display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #0f2a4a; padding-bottom: 10px; margin-bottom: 15px; }}
+            .logo {{ max-height: 65px; max-width: 190px; object-fit: contain; }}
+            .header-info {{ text-align: right; font-size: 11px; color: #666; margin-bottom: 12px; }}
+            .title {{ color: #0f2a4a; font-size: 20px; font-weight: bold; margin: 0 0 3px 0; }}
+            .subtitle {{ color: #555; font-size: 13px; margin: 0; }}
+            .section-title {{ color: #0f2a4a; font-size: 14px; font-weight: bold; margin-top: 15px; margin-bottom: 8px; border-bottom: 1px solid #ddd; padding-bottom: 3px; }}
+            .grid-params {{ display: flex; flex-wrap: wrap; gap: 10px 25px; background-color: #f8fafc !important; padding: 10px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #e2e8f0; }}
+            .param-item {{ font-size: 11px; }}
+            
+            table {{ width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 11px; }}
+            th, td {{ border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; }}
+            th {{ background-color: #0f2a4a !important; color: white !important; font-weight: 600; font-size: 11px; }}
+            tr:nth-child(even) {{ background-color: #f8fafc !important; }}
+            
+            .footer {{ margin-top: 25px; text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 8px; }}
+            .page-break {{ page-break-before: always; break-before: page; }}
+            .flex-container {{ display: flex; gap: 20px; align-items: flex-start; margin-top: 10px; }}
+            
+            @media print {{
+                .btn-print {{ display: none; }}
+                body {{ margin: 15px; }}
+                * {{
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                }}
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <div>
+                <h1 class="title">Maxsuel Contabilidade</h1>
+                <p class="subtitle">Relatório Estratégico de Planejamento Tributário - Reforma Tributária</p>
+            </div>
+            <div>{logo_tag}</div>
+        </div>
+        
+        <div class="header-info">
+            Emitido em: {data_atual} | Competência Fiscal: 2026
+        </div>
+
+        <div class="section-title">Parâmetros de Entrada Aplicados</div>
+        <div class="grid-params">
+            <div class="param-item"><b>Receita Acumulada (RBT12):</b> {formatar_br(rbt12)}</div>
+            <div class="param-item"><b>Faturamento Projetado no Mês:</b> {formatar_br(faturamento_mes)}</div>
+            <div class="param-item"><b>Insumos c/ Crédito:</b> {formatar_br(compras_insumos)}</div>
+            <div class="param-item"><b>CBS Ref. / IBS Ref.:</b> {cbs_ref:.1f}% / {ibs_ref:.1f}%</div>
+            <div class="param-item"><b>Benefício LC 214:</b> {reducao_rotulo}</div>
+        </div>
+
+        <div class="section-title">Painel Comparativo de Cenários (Simples Unificado vs. IBS/CBS Por Fora)</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Anexo Fiscal</th>
+                    <th>DAS Tradicional</th>
+                    <th>DAS Reduzido</th>
+                    <th>CBS Por Fora</th>
+                    <th>IBS Por Fora</th>
+                    <th>Carga Total (Reforma)</th>
+                    <th>Diferença (R$)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {html_linhas_tabela}
+            </tbody>
+        </table>
+
+        <div class="section-title">Diagnóstico Estratégico e Parecer Fiscal</div>
+        {html_diag_b2c}
+        {html_diag_b2b}
+
+        <!-- PÁGINA 2 DO PDF IMPRESSO -->
+        <div class="page-break"></div>
+        
+        <div class="section-title" style="margin-top: 20px;">Detalhamento de Rateio Interno da Guia - {anexo_detalhe} (DAS Tradicional)</div>
+        
+        <div class="flex-container">
+            <div style="flex: 1;">
+                <table style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th>Imposto / Ente Federativo</th>
+                            <th>Valor Destinado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {html_linhas_rateio}
+                    </tbody>
+                </table>
+            </div>
+            
+            <div style="flex: 1; background-color: #f8fafc !important; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                <b style="font-size: 12px; color: #0f2a4a; display: block; margin-bottom: 10px;">Distribuição Proporcional dos Impostos</b>
+                {html_barras_grafico}
+            </div>
+        </div>
+
+        <div class="footer">
+            Hub de Soluções Contábeis Maxsuel © 2026 - Documento gerado eletronicamente para suporte decisório estratégico.
+        </div>
+        
+        <script>
+            window.onload = function() {{ window.print(); }}
+        </script>
+    </body>
+    </html>
+    """
+    st.info("Clique no botão abaixo para gerar o arquivo de impressão. O relatório virá com a sua logomarca oficial e abrirá a tela de impressão do seu computador automaticamente.")
+    st.download_button(
+        label="🖨️ Baixar e Imprimir Relatório Fiscal",
+        data=html_template,
+        file_name=f"Simulacao_Simples_Nacional_Reforma_{datetime.now().strftime('%Y%m%d')}.html",
+        mime="text/html",
+        use_container_width=True
+    )
 
 # ==============================================================================
 # TELA 4: MÓDULO DE FOLHA & FATOR R
 # ==============================================================================
 elif st.session_state.pagina_selecionada == "📋 Módulo de Folha & Fator R":
-    st.title("📋 Painel Estratégico de DP: Folha & Fator R (Art. 26 Res. CGSN 140/2018)")
-    c1, c2, c3 = st.columns(3)
-    rbt12_fr = c1.number_input("RBT12 (12 meses anteriores - R$):", min_value=1.0, value=600000.0, step=10000.0)
-    folha_12m_fr = c2.number_input("Folha + Pró-Labore + CPP/FGTS 12m (R$):", min_value=0.0, value=150000.0, step=5000.0)
-    fat_mes_fr = c3.number_input("Faturamento Mensal Atual (R$):", min_value=0.0, value=50000.0, step=5000.0)
-
-    fator_r_atual = folha_12m_fr / rbt12_fr
-    folha_alvo_12m = rbt12_fr * 0.28
-    diferenca_anual = max(0.0, folha_alvo_12m - folha_12m_fr)
-
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Fator R Atual", f"{fator_r_atual*100:.2f}%", "Anexo III" if fator_r_atual >= 0.28 else "Anexo V")
-    m2.metric("Folha Mínima Anual (28%)", formatar_br(folha_alvo_12m))
-    m3.metric("Ajuste Anual Necessário", formatar_br(diferenca_anual))
-
-    res_iii = calcular_simples_nacional(
-        ParametrosSimulacao(faturamento_mes=fat_mes_fr, rbt12=rbt12_fr, anexo_simples="Anexo III - Serviços (Fator R >= 28% / Locação / Contabilidade)", sujeito_fator_r=False)
-    )
-    res_v = calcular_simples_nacional(
-        ParametrosSimulacao(faturamento_mes=fat_mes_fr, rbt12=rbt12_fr, anexo_simples="Anexo V - Serviços (Fator R < 28% / Engenharia, TI, Consultoria)", sujeito_fator_r=False)
-    )
-    economia_mensal_das = res_v["das"] - res_iii["das"]
-    st.info(
-        f"📌 **Comparativo Direto:** No **Anexo V** o DAS mensal é **{formatar_br(res_v['das'])}** ({res_v['aliquota_efetiva_das_pct']:.2f}%). "
-        f"Atingindo Fator R >= 28%, cai para **{formatar_br(res_iii['das'])}** ({res_iii['aliquota_efetiva_das_pct']:.2f}%) no **Anexo III** — "
-        f"economia bruta de DAS de **{formatar_br(economia_mensal_das)}/mês**."
-    )
-
-
-# ==============================================================================
-# TELA 5: MÓDULO CONTÁBIL (PRESERVADO DO PROJETO GITHUB)
-# ==============================================================================
-elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
-    sub_menu = st.radio(
-        "Seções Contábeis:",
-        ["🏢 Cadastro de Empresas", "📝 Lançamentos", "⚖️ Balancete", "📊 DRE", "⚖️ Balanço Patrimonial"],
-        horizontal=True,
-    )
-
-    if sub_menu == "🏢 Cadastro de Empresas":
-        st.title("🏢 Painel de Cadastro Corporativo")
-        with st.form("form_cadastro_empresa", clear_on_submit=True):
-            nome_empresa = st.text_input("Razão Social / Nome Fantasia")
-            cnpj_empresa = st.text_input("CNPJ")
-            if st.form_submit_button("Salvar Empresa Definitivamente"):
-                if nome_empresa and cnpj_empresa:
-                    try:
-                        conn = conectar_db()
-                        conn.execute("INSERT INTO empresas (nome, cnpj) VALUES (?, ?)", (nome_empresa, cnpj_empresa))
-                        conn.commit()
-                        conn.close()
-                        st.success(f"Empresa '{nome_empresa}' cadastrada com sucesso!")
-                        st.rerun()
-                    except sqlite3.IntegrityError:
-                        st.error("Já existe uma empresa cadastrada com este CNPJ.")
-                else:
-                    st.error("Preencha todos os campos.")
-        st.divider()
-        if not df_empresas.empty:
-            st.dataframe(df_empresas, use_container_width=True, hide_index=True)
-
-    elif empresa_id_atual is None:
-        st.warning("⚠️ Cadastre ou selecione uma empresa na aba '🏢 Cadastro de Empresas'.")
-
-    elif sub_menu == "📝 Lançamentos":
-        st.title("📝 Livro Diário de Lançamentos")
-        st.info(f"Empresa Ativa: **{empresa_selecionada}** | CNPJ: {cnpj_empresa_atual}")
-        with st.form("form_lancamento", clear_on_submit=True):
-            c1, c2 = st.columns(2)
-            data_l = c1.date_input("Data")
-            valor_l = c2.number_input("Valor (R$)", min_value=0.01, format="%.2f")
-            c_deb = st.selectbox("Conta Débito", list(PLANO_DE_CONTAS.keys()), format_func=lambda x: f"{x} - {PLANO_DE_CONTAS[x]}")
-            c_cred = st.selectbox("Conta Crédito", list(PLANO_DE_CONTAS.keys()), format_func=lambda x: f"{x} - {PLANO_DE_CONTAS[x]}")
-            hist_l = st.text_input("Histórico")
-            if st.form_submit_button("Confirmar Lançamento"):
-                salvar_lancamento_db(empresa_id_atual, data_l, c_deb, c_cred, valor_l, hist_l)
-                st.success("Lançamento salvo!")
-                st.rerun()
-
-        if st.session_state.livro_diario:
-            df_d = pd.DataFrame(st.session_state.livro_diario)
-            st.dataframe(df_d, use_container_width=True, hide_index=True)
-
-    elif sub_menu == "⚖️ Balancete":
-        st.title("⚖️ Balancete de Verificação")
-        conn = conectar_db()
-        df_l = pd.read_sql_query("SELECT * FROM lancamentos WHERE empresa_id = ?", conn, params=(int(empresa_id_atual),))
-        conn.close()
-        dados_bal = []
-        for cod, nome in PLANO_DE_CONTAS.items():
-            deb = float(df_l[df_l["debito"] == cod]["valor"].sum()) if not df_l.empty else 0.0
-            cred = float(df_l[df_l["credito"] == cod]["valor"].sum()) if not df_l.empty else 0.0
-            if deb > 0 or cred > 0:
-                saldo = (deb - cred) if cod.startswith(("1", "5", "6")) else (cred - deb)
-                dados_bal.append({"Código": cod, "Conta": nome, "Débito": formatar_br(deb), "Crédito": formatar_br(cred), "Saldo": formatar_br(saldo)})
-        if dados_bal:
-            st.table(pd.DataFrame(dados_bal))
+    st.title("📋 Painel Estratégico de DP: Folha & Fator R")
+    
+    sub_aba_dp = st.radio("Escolha a Operação:", ["🔍 Análise do Fator R", "🧮 Simulador Prático de Salário Líquido (2026)"], horizontal=True)
+    st.divider()
+    
+    if sub_aba_dp == "🔍 Análise do Fator R":
+        st.subheader("Análise Preventiva do Fator R (Anexos III e V)")
+        st.markdown("Insira o histórico acumulado dos últimos 12 meses da empresa para projetar o enquadramento tributário.")
+        
+        col_f1, col_f2 = st.columns(2)
+        faturamento_acumulado = col_f1.number_input("Faturamento Bruto Acumulado (Últimos 12 meses):", min_value=0.00, value=100000.00, step=1000.00, format="%.2f")
+        folha_acumulada = col_f2.number_input("Massa Salarial / CPP / Pró-Labore (Últimos 12 meses):", min_value=0.00, value=30000.00, step=500.00, format="%.2f")
+        
+        if faturamento_acumulado > 0:
+            fator_r_calculado = (folha_acumulada / faturamento_acumulado) * 100
+            st.metric("Fator R Apurado", f"{fator_r_calculado:.2f}%")
+            
+            if fator_r_calculado >= 28.0:
+                st.success("🟢 **Empresa Enquadrada no Anexo III!** Devido à proporção da folha ser maior ou igual a 28%, a tributação da prestação de serviços iniciará em **6%** em vez de 15,5%.")
+            else:
+                st.warning("🔴 **Empresa Enquadrada no Anexo V!** Como a proporção da folha está abaixo de 28%, a tributação iniciará na alíquota padrão de **15,50%**.")
+                
+            progresso = min(1.0, float(fator_r_calculado / 28.0))
+            st.progress(progresso, text=f"Proporção da meta legal (Mínimo 28%): {fator_r_calculado:.2f}% / 28,00%")
         else:
-            st.info("Sem movimentações registradas para esta empresa.")
+            st.info("Insira um valor de faturamento acumulado válido para calcular o Fator R.")
+            
+    elif sub_aba_dp == "🧮 Simulador Prático de Salário Líquido (2026)":
+        st.subheader("Simulador de Folha de Pagamento & Férias - Competência 2026")
+        st.markdown("Cálculo integrado com os novos tetos de INSS, deduções legais e regras de férias.")
+        
+        st.sidebar.header("⚙️ Parâmetros do Trabalhador")
+        salario_bruto = st.sidebar.number_input("Salário Bruto / Pró-Labore (R$):", min_value=0.00, value=6500.00, step=100.00, format="%.2f")
+        num_dependentes = st.sidebar.number_input("Número de Dependentes:", min_value=0, value=0, step=1)
+        
+        st.sidebar.subheader("❌ Descontos Legais (Mensais)")
+        valor_faltas = st.sidebar.number_input("Valor de Faltas (R$):", min_value=0.00, value=0.00, step=50.00, format="%.2f")
+        valor_atrasos = st.sidebar.number_input("Valor de Atrasos/DSR (R$):", min_value=0.00, value=0.00, step=10.00, format="%.2f")
+        
+        st.sidebar.subheader("🏖️ Opções de Férias")
+        calcular_ferias = st.sidebar.checkbox("Simular Recibo de Férias?")
+        
+        dias_gozo = 30
+        abono_pecuniario = False
+        adianta_13 = False
+        liquido_ferias = 0.0
+        
+        if calcular_ferias:
+            dias_gozo = st.sidebar.slider("Dias de Férias a Gozar:", min_value=10, max_value=30, value=30)
+            abono_pecuniario = st.sidebar.checkbox("Vender 1/3 das Férias (Abono Pecuniário)?")
+            adianta_13 = st.sidebar.checkbox("Adiantar 1ª Parcela do 13º?")
+        
+        total_descontos_legais = valor_faltas + valor_atrasos
+        salario_sujeito_encargos = max(0.0, salario_bruto - total_descontos_legais)
+        
+        def calcular_inss_2026(valor_base):
+            teto_inss = 8475.55
+            salario_calculo_inss = min(valor_base, teto_inss)
+            if salario_calculo_inss <= 1621.00: return salario_calculo_inss * 0.075
+            elif salario_calculo_inss <= 2902.84: return (salario_calculo_inss * 0.090) - 24.32
+            elif salario_calculo_inss <= 4354.27: return (salario_calculo_inss * 0.120) - 111.40
+            else: return (salario_calculo_inss * 0.140) - 198.49
 
-    elif sub_menu == "📊 DRE":
-        st.title("📊 Demonstrativo de Resultado do Exercício (DRE)")
-        saldos = calcular_saldos(empresa_id_atual)
-        lucro = saldos.get("4.01", 0.0) - saldos.get("5.01", 0.0) - saldos.get("5.02", 0.0) - saldos.get("6.01", 0.0)
-        st.metric("LUCRO LÍQUIDO DO PERÍODO", formatar_br(lucro))
-        st.table(
-            pd.DataFrame(
-                [
-                    {"Estrutura": "Receita Bruta (4.01)", "Valor": formatar_br(saldos.get("4.01", 0.0))},
-                    {"Estrutura": "(-) Despesas Operacionais (5.01)", "Valor": formatar_br(-saldos.get("5.01", 0.0))},
-                    {"Estrutura": "(-) Distribuição de Dividendos (5.02)", "Valor": formatar_br(-saldos.get("5.02", 0.0))},
-                    {"Estrutura": "(-) Impostos Incidentes (6.01)", "Valor": formatar_br(-saldos.get("6.01", 0.0))},
-                    {"Estrutura": "(=) Resultado Líquido", "Valor": formatar_br(lucro)},
-                ]
-            )
-        )
+        def calcular_irrf_2026(valor_base, inss_retido, dependentes):
+            deducao_dependentes = dependentes * 189.59
+            base_irrf = max(0.0, valor_base - inss_retido - deducao_dependentes)
+            
+            if base_irrf <= 2259.20: irrf_bruto = 0.0
+            elif base_irrf <= 2826.65: irrf_bruto = (base_irrf * 0.075) - 169.44
+            elif base_irrf <= 3751.05: irrf_bruto = (base_irrf * 0.150) - 381.44
+            elif base_irrf <= 4664.68: irrf_bruto = (base_irrf * 0.225) - 662.77
+            else: irrf_bruto = (base_irrf * 0.275) - 896.00
+                
+            if base_irrf <= 5000.00: reducao = min(irrf_bruto, 312.89)
+            elif base_irrf <= 7350.00: reducao = max(0.0, 978.62 - (0.133145 * base_irrf))
+            else: reducao = 0.0
+                
+            return max(0.0, irrf_bruto - reducao), base_irrf, reducao
 
-    elif sub_menu == "⚖️ Balanço Patrimonial":
-        st.title("⚖️ Balanço Patrimonial Consolidado")
-        saldos = calcular_saldos(empresa_id_atual)
-        lucro = saldos.get("4.01", 0.0) - saldos.get("5.01", 0.0) - saldos.get("5.02", 0.0) - saldos.get("6.01", 0.0)
-        saldos["2.05"] = saldos.get("2.05", 0.0) + lucro
-        col_a, col_p = st.columns(2)
-        with col_a:
-            st.subheader("🔵 ATIVO")
-            st.table(pd.DataFrame([{"Conta": n, "Valor": formatar_br(saldos.get(c, 0.0))} for c, n in PLANO_DE_CONTAS.items() if c.startswith("1")]))
-        with col_p:
-            st.subheader("🟡 PASSIVO + PL")
-            st.table(pd.DataFrame([{"Conta": n, "Valor": formatar_br(saldos.get(c, 0.0))} for c, n in PLANO_DE_CONTAS.items() if c.startswith("2")]))
+        if calcular_ferias:
+            st.subheader("🏖️ Demonstrativo de Recibo de Férias")
+            dias_faturamento_ferias = 20 if abono_pecuniario else dias_gozo
+            
+            valor_ferias_gozadas = (salario_bruto / 30) * dias_faturamento_ferias
+            terco_constitucional = valor_ferias_gozadas / 3
+            
+            valor_abono = (salario_bruto / 30) * 10 if abono_pecuniario else 0.0
+            terco_abono = valor_abono / 3 if abono_pecuniario else 0.0
+            adiantamento_13o_valor = (salario_bruto / 2) if adianta_13 else 0.0
+            
+            base_tributavel_ferias = valor_ferias_gozadas + terco_constitucional
+            inss_ferias = calcular_inss_2026(base_tributavel_ferias)
+            irrf_ferias, base_irrf_fer, red_irrf_fer = calcular_irrf_2026(base_tributavel_ferias, inss_ferias, num_dependentes)
+            
+            total_proventos_ferias = valor_ferias_gozadas + terco_constitucional + valor_abono + terco_abono + adiantamento_13o_valor
+            total_descontos_ferias = inss_ferias + irrf_ferias
+            liquido_ferias = total_proventos_ferias - total_descontos_ferias
+            
+            df_ferias = pd.DataFrame([
+                {"Evento / Rubrica": f"🟢 Férias Gozadas ({dias_faturamento_ferias} dias)", "Tipo": "Provento", "Valor": formatar_br(valor_ferias_gozadas)},
+                {"Evento / Rubrica": "🟢 1/3 Constitucional de Férias", "Tipo": "Provento", "Valor": formatar_br(terco_constitucional)},
+                {"Evento / Rubrica": "🟢 Abono Pecuniário (10 dias vendidos)", "Tipo": "Indenização", "Valor": formatar_br(valor_abono)},
+                {"Evento / Rubrica": "🟢 1/3 Constitucional sobre Abono", "Tipo": "Indenização", "Valor": formatar_br(terco_abono)},
+                {"Evento / Rubrica": "🟢 Adiantamento da 1ª Parcela do 13º", "Tipo": "Adiantamento", "Valor": formatar_br(adiantamento_13o_valor)},
+                {"Evento / Rubrica": "🔴 Desconto INSS sobre Férias", "Tipo": "Desconto", "Valor": formatar_br(-inss_ferias)},
+                {"Evento / Rubrica": "🔴 Desconto IRRF sobre Férias", "Tipo": "Desconto", "Valor": formatar_br(-irrf_ferias)},
+                {"Evento / Rubrica": "💰 VALOR LÍQUIDO DE FÉRIAS A RECEBER", "Tipo": "Totalizador", "Valor": formatar_br(liquido_ferias)},
+            ])
+            df_ferias = df_ferias[df_ferias["Valor"] != formatar_br(0.0)]
+            st.table(df_ferias)
+
+        inss_desconto = calcular_inss_2026(salario_sujeito_encargos)
+        irrf_final, base_irrf, reducao_imposto = calcular_irrf_2026(salario_sujeito_encargos, inss_desconto, num_dependentes)
+        salario_liquido = salario_sujeito_encargos - inss_desconto - irrf_final
+        
+        st.subheader("📋 Demonstrativo de Pagamento Mensal Emitido")
+        linhas_holerite = [{"Evento / Rubrica": "🟢 Salário Base / Bruto", "Tipo": "Provento", "Valor": formatar_br(salario_bruto)}]
+        
+        if valor_faltas > 0: linhas_holerite.append({"Evento / Rubrica": "🔴 Desconto de Faltas", "Tipo": "Desconto", "Valor": formatar_br(-valor_faltas)})
+        if valor_atrasos > 0: linhas_holerite.append({"Evento / Rubrica": "🔴 Desconto de Atrasos / DSR", "Tipo": "Desconto", "Valor": formatar_br(-valor_atrasos)})
+            
+        linhas_holerite.extend([
+            {"Evento / Rubrica": "🔴 Desconto INSS Previdenciário", "Tipo": "Desconto", "Valor": formatar_br(-inss_desconto)},
+            {"Evento / Rubrica": f"⚪ Base de Cálculo Líquida do IRRF ({num_dependentes} dep.)", "Tipo": "Informativo", "Valor": formatar_br(base_irrf)},
+            {"Evento / Rubrica": "🟢 Redução de IRRF (Lei nº 15.270/2025)", "Tipo": "Benefício", "Valor": formatar_br(reducao_imposto)},
+            {"Evento / Rubrica": "🔴 Desconto IRRF Efetivo Retido", "Tipo": "Desconto", "Valor": formatar_br(-irrf_final)},
+            {"Evento / Rubrica": "💰 SALÁRIO LÍQUIDO MENSAL A RECEBER", "Tipo": "Totalizador", "Valor": formatar_br(salario_liquido)},
+        ])
+        
+        df_holerite = pd.DataFrame(linhas_holerite)
+        st.table(df_holerite)
+        
+        if calcular_ferias:
+            st.divider()
+            st.subheader("💰 Resumo Consolidado de Recebimentos")
+            total_liquido_geral = salario_liquido + liquido_ferias
+            
+            col_g1, col_g2, col_g3 = st.columns(3)
+            col_g1.metric("Salário Líquido Mensal", formatar_br(salario_liquido))
+            col_g2.metric("Líquido de Férias", formatar_br(liquido_ferias))
+            col_g3.metric("TOTAL LÍQUIDO CONSOLIDADO", formatar_br(total_liquido_geral), delta="Mês + Férias", delta_color="inverse")
+            st.divider()
+        else:
+            col_c1, col_c2, col_c3 = st.columns(3)
+            col_c1.metric("Total Descontado (Folha)", formatar_br(inss_desconto + irrf_final + total_descontos_legais))
+            col_c2.metric("Alíquota Efetiva de INSS", f"{(inss_desconto / salario_sujeito_encargos * 100) if salario_sujeito_encargos > 0 else 0:.2f}%")
+            col_c3.metric("IRRF Retido Final", formatar_br(irrf_final))
+# ==============================================================================
+# TELA 5: PLANEJAMENTO TRIBUTÁRIO COMPARATIVO TRÍPLICE (REFORMA & +10% PRESUNÇÃO)
+# ==============================================================================
+elif st.session_state.pagina_selecionada == "📊 Planejamento Tributário Comparativo":
+    st.title("📊 Planejamento Tributário Comparativo (Simples x Presumido x Real)")
+
+    # --- SELETOR DE MODELO NO INÍCIO DA SIMULAÇÃO ---
+    st.markdown("### ⚙️ Configuração da Legislação")
+    modelo_tributario = st.selectbox(
+        "Selecione o Modelo de Tributação de Consumo:",
+        ["Modelo Atual (PIS / COFINS / ICMS / ISS)", "Modelo Pós-Reforma Tributária (CBS / IBS)"],
+        help="Altera dinamicamente as regras e nomenclaturas dos impostos sobre vendas/serviços."
+    )
+    
+    st.info(f"💡 Presunções do Lucro Presumido reajustadas em **+10%** conforme novos parâmetros fiscais. Modelo Selecionado: **{modelo_tributario}**")
+    st.divider()
+
+    st.subheader("📥 Parâmetros Financeiros e Operacionais")
+    col_i1, col_i2, col_i3 = st.columns(3)
+    fat_mes = col_i1.number_input("Faturamento Estimado do Mês (R$):", min_value=0.0, value=50000.0, step=5000.0)
+    rbt12_comp = col_i2.number_input("RBT12 (Simples Nacional - R$):", min_value=0.0, value=600000.0, step=10000.0)
+    atividade = col_i3.selectbox("Atividade Principal:", ["Comércio / Indústria", "Serviços em Geral"])
+
+    col_i4, col_i5, col_i6 = st.columns(3)
+    despesas_op = col_i4.number_input("Despesas Operacionais (Mês):", min_value=0.0, value=20000.0, step=2000.0)
+    insumos_cred = col_i5.number_input("Compras c/ Crédito PIS/COFINS ou CBS/IBS:", min_value=0.0, value=10000.0, step=1000.0)
+    folha_comp = col_i6.number_input("Folha / Pró-Labore (Mês):", min_value=0.0, value=8000.0, step=1000.0)
+
+    col_i7, col_i8 = st.columns(2)
+    anexo_simples = col_i7.selectbox("Anexo no Simples Nacional:", list(TABELAS_PADRAO.keys()))
+    distribuicao_lucro = col_i8.number_input("Distribuição de Lucros (Mês):", min_value=0.0, value=0.0, step=5000.0, help="Parcelas > R$ 50.000 retêm 10% de IRRF pela Lei 15.270.")
+
+    # --- CÁLCULOS ---
+    faixas = TABELAS_PADRAO[anexo_simples]
+    aliq_nom, deducao = 0.0, 0.0
+    for limite, aliq, ded in faixas:
+        if rbt12_comp <= limite:
+            aliq_nom, deducao = aliq, ded
+            break
+    
+    aliq_efetiva_simples = max(0.0, ((rbt12_comp * aliq_nom) - deducao) / rbt12_comp) if rbt12_comp > 0 else aliq_nom
+    imposto_simples = fat_mes * aliq_efetiva_simples
+    inss_simples = (folha_comp * 0.20) if "Anexo IV" in anexo_simples else 0.0
+    irrf_lucros_simples = max(0.0, (distribuicao_lucro - 50000.0) * 0.10) if distribuicao_lucro > 50000.0 else 0.0
+    total_simples = imposto_simples + inss_simples + irrf_lucros_simples
+
+    res_presumido = calcular_lucro_presumido(fat_mes, atividade, folha_comp, distribuicao_lucro, modelo_tributario)
+    res_real = calcular_lucro_real(fat_mes, despesas_op, insumos_cred, folha_comp, distribuicao_lucro, modelo_tributario)
+
+    # --- TELA: PAINEL DE SÍNTESE ---
+    st.divider()
+    st.subheader("⚖️ Resumo Consolidado de Carga Tributária")
+
+    lbl_faturamento = "Impostos s/ Venda (PIS/COFINS/ICMS)" if "Atual" in modelo_tributario else "Impostos s/ Venda (CBS/IBS)"
+
+    df_resumo = pd.DataFrame([
+        {
+            "Regime": "Simples Nacional",
+            lbl_faturamento: formatar_br(imposto_simples),
+            "Tributos s/ Renda (IR/CS)": "Incluso no DAS",
+            "INSS Patronal": formatar_br(inss_simples),
+            "IRRF Lucros (>50k)": formatar_br(irrf_lucros_simples),
+            "Carga Total": formatar_br(total_simples),
+            "Alíquota Efetiva": f"{(total_simples/fat_mes*100) if fat_mes > 0 else 0:.2f}%"
+        },
+        {
+            "Regime": "Lucro Presumido",
+            lbl_faturamento: formatar_br(res_presumido["Subtotal Faturamento"]),
+            "Tributos s/ Renda (IR/CS)": formatar_br(res_presumido["Subtotal Renda"]),
+            "INSS Patronal": formatar_br(res_presumido["INSS Patronal"]),
+            "IRRF Lucros (>50k)": formatar_br(res_presumido["IRRF Lucros (>50k)"]),
+            "Carga Total": formatar_br(res_presumido["Total Tributos"]),
+            "Alíquota Efetiva": f"{res_presumido['Aliquota Efetiva']:.2f}%"
+        },
+        {
+            "Regime": "Lucro Real",
+            lbl_faturamento: formatar_br(res_real["Subtotal Faturamento"]),
+            "Tributos s/ Renda (IR/CS)": formatar_br(res_real["Subtotal Renda"]),
+            "INSS Patronal": formatar_br(res_real["INSS Patronal"]),
+            "IRRF Lucros (>50k)": formatar_br(res_real["IRRF Lucros (>50k)"]),
+            "Carga Total": formatar_br(res_real["Total Tributos"]),
+            "Alíquota Efetiva": f"{res_real['Aliquota Efetiva']:.2f}%"
+        }
+    ])
+    st.table(df_resumo)
+
+    # --- EXPANDERS COM DADOS DINÂMICOS PIS/COFINS OU CBS/IBS ---
+    st.subheader("🔍 Detalhamento das Bases e Composição de Apuração")
+
+    with st.expander("📌 Ver Memória de Cálculo - Lucro Presumido", expanded=False):
+        col_p1, col_p2 = st.columns(2)
+        with col_p1:
+            st.markdown("**Tributação sobre a Renda (IRPJ e CSLL):**")
+            st.write(f"- Presunção Aplicada (+10%): `{res_presumido['Base IRPJ/CSLL']}`")
+            st.write(f"- IRPJ (15% + Adicional 10%): **{formatar_br(res_presumido['IRPJ'])}**")
+            st.write(f"- CSLL (9%): **{formatar_br(res_presumido['CSLL'])}**")
+        with col_p2:
+            st.markdown(f"**Tributação sobre Consumo/Vendas ({'Modelo Atual' if 'Atual' in modelo_tributario else 'Pós-Reforma'}):**")
+            st.write(f"- {res_presumido['Label Trib 1']}: **{formatar_br(res_presumido['Val Trib 1'])}**")
+            st.write(f"- {res_presumido['Label Trib 2']}: **{formatar_br(res_presumido['Val Trib 2'])}**")
+            st.write(f"- INSS Patronal (27,8% s/ folha): **{formatar_br(res_presumido['INSS Patronal'])}**")
+
+    with st.expander("📌 Ver Memória de Cálculo - Lucro Real", expanded=False):
+        col_r1, col_r2 = st.columns(2)
+        with col_r1:
+            st.markdown("**Tributação sobre a Renda (IRPJ e CSLL):**")
+            st.write(f"- Base do Lucro Real: `{res_real['Base IRPJ/CSLL']}`")
+            st.write(f"- IRPJ (15% + Adicional 10%): **{formatar_br(res_real['IRPJ'])}**")
+            st.write(f"- CSLL (9%): **{formatar_br(res_real['CSLL'])}**")
+        with col_r2:
+            st.markdown(f"**Tributação sobre Consumo/Vendas ({'Modelo Atual' if 'Atual' in modelo_tributario else 'Pós-Reforma'}):**")
+            st.write(f"- {res_real['Label Trib 1']}: **{formatar_br(res_real['Val Trib 1'])}**")
+            st.write(f"- {res_real['Label Trib 2']}: **{formatar_br(res_real['Val Trib 2'])}**")
+            st.write(f"- INSS Patronal (27,8% s/ folha): **{formatar_br(res_real['INSS Patronal'])}**")
+
+    # Destaque Final
+    menor_valor = min([total_simples, res_presumido["Total Tributos"], res_real["Total Tributos"]])
+    if menor_valor == total_simples:
+        vencedor = "Simples Nacional"
+    elif menor_valor == res_presumido["Total Tributos"]:
+        vencedor = "Lucro Presumido"
+    else:
+        vencedor = "Lucro Real"
+
+    st.success(f"🏆 **Cenário Mais Vantajoso:** O **{vencedor}** apresenta a menor carga fiscal global de **{formatar_br(menor_valor)}**.")
+    
+# ==============================================================================
+# FINAL DA TELA 5: MONTAGEM E IMPRESSÃO INTEGRAIS DO RELATÓRIO EXECUTIVO
+# ==============================================================================
+    menor_valor = min([total_simples, res_presumido["Total Tributos"], res_real["Total Tributos"]])
+    
+    if menor_valor == total_simples:
+        vencedor_nome = "Simples Nacional"
+    elif menor_valor == res_presumido["Total Tributos"]:
+        vencedor_nome = "Lucro Presumido"
+    else:
+        vencedor_nome = "Lucro Real"
+
+    # 1. Dicionário de Parâmetros de Entrada
+    params = {
+        "Faturamento Mensal": formatar_br(fat_mes),
+        "RBT12 (Simples)": formatar_br(rbt12_comp),
+        "Atividade": atividade,
+        "Despesas Operacionais": formatar_br(despesas_op),
+        "Insumos c/ Crédito": formatar_br(insumos_cred),
+        "Folha / Pró-Labore": formatar_br(folha_comp),
+        "Modelo Tributário": modelo_tributario,
+        "Anexo Simples": anexo_simples,
+        "Distribuição de Lucro": formatar_br(distribuicao_lucro)
+    }
+
+    lbl_faturam = "Impostos s/ Venda (PIS/COFINS/ICMS)" if "Atual" in modelo_tributario else "Impostos s/ Venda (CBS/IBS)"
+    colunas = ["Regime Tributário", lbl_faturam, "Tributos s/ Renda", "INSS Patronal", "IRRF Lucros (>50k)", "Carga Total (R$)", "Alíquota Efetiva"]
+
+    dados = [
+        ["Simples Nacional", formatar_br(imposto_simples), "Incluso no DAS", formatar_br(inss_simples), formatar_br(irrf_lucros_simples), formatar_br(total_simples), f"{(total_simples/fat_mes*100) if fat_mes > 0 else 0:.2f}%"],
+        ["Lucro Presumido", formatar_br(res_presumido["Subtotal Faturamento"]), formatar_br(res_presumido["Subtotal Renda"]), formatar_br(res_presumido["INSS Patronal"]), formatar_br(res_presumido["IRRF Lucros (>50k)"]), formatar_br(res_presumido["Total Tributos"]), f"{res_presumido['Aliquota Efetiva']:.2f}%"],
+        ["Lucro Real", formatar_br(res_real["Subtotal Faturamento"]), formatar_br(res_real["Subtotal Renda"]), formatar_br(res_real["INSS Patronal"]), formatar_br(res_real["IRRF Lucros (>50k)"]), formatar_br(res_real["Total Tributos"]), f"{res_real['Aliquota Efetiva']:.2f}%"]
+    ]
+
+    # 2. Dicionários para Memória de Cálculo no Relatório
+    mem_presumido = {
+        "Presunção Aplicada (+10%)": res_presumido["Base IRPJ/CSLL"],
+        "IRPJ (15% + Adicional)": formatar_br(res_presumido["IRPJ"]),
+        "CSLL (9%)": formatar_br(res_presumido["CSLL"]),
+        res_presumido["Label Trib 1"]: formatar_br(res_presumido["Val Trib 1"]),
+        res_presumido["Label Trib 2"]: formatar_br(res_presumido["Val Trib 2"]),
+        "INSS Patronal (27,8%)": formatar_br(res_presumido["INSS Patronal"])
+    }
+
+    mem_real = {
+        "Base Lucro Real": res_real["Base IRPJ/CSLL"],
+        "IRPJ (15% + Adicional)": formatar_br(res_real["IRPJ"]),
+        "CSLL (9%)": formatar_br(res_real["CSLL"]),
+        res_real["Label Trib 1"]: formatar_br(res_real["Val Trib 1"]),
+        res_real["Label Trib 2"]: formatar_br(res_real["Val Trib 2"]),
+        "INSS Patronal (27,8%)": formatar_br(res_real["INSS Patronal"])
+    }
+
+    rec = f"O regime do <strong>{vencedor_nome}</strong> apresenta a menor carga tributária total, gerando um desembolso estimado de <strong>{formatar_br(menor_valor)}</strong> por mês."
+    obs = f"Cenário apurado sob o <strong>{modelo_tributario}</strong>. Presunções do Lucro Presumido reajustadas em +10% e retenções da Lei nº 15.270 incidentes sobre parcelas de lucros que superam R$ 50.000,00/mês."
+
+   # 3. Geração e Exibição do Link de Impressão Direta
+    html_final = gerar_relatorio_html(
+        "Relatório Estratégico de Planejamento Tributário Comparativo", 
+        params, colunas, dados, mem_presumido, mem_real, rec, obs
+    )
+
+    b64 = base64.b64encode(html_final.encode('utf-8')).decode('utf-8')
+    nome_arquivo = f"Simulacao_Planejamento_Tributario_{datetime.now().strftime('%Y%m%d%H%M')}.html"
+
+    st.markdown(
+        f'''
+        <a href="data:text/html;charset=utf-8;base64,{b64}" download="{nome_arquivo}" target="_blank" 
+           style="display: inline-block; background-color: #0f172a; color: white; padding: 12px 24px; 
+                  text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px;">
+            🖨️ Gerar e Imprimir Relatório Executivo
+        </a>
+        ''',
+        unsafe_allow_html=True
+    )
