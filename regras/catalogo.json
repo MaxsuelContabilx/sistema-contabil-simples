@@ -1,0 +1,20 @@
+{
+  "formato": 1,
+  "versoes": [
+    {
+      "id": "2026-revisao-0.2",
+      "inicio": "2026-01-01",
+      "fim": "2026-12-31",
+      "estado": "revisao",
+      "revisao_em": "2026-11-15",
+      "descricao": "Projeção anual por competência; regras gerais e limitações explícitas. Não homologada.",
+      "atualizacoes_pendentes": [
+        "Fechamento anual da LC 224 com majoração e ajustes",
+        "Tributos de consumo e folha",
+        "Tratamentos especiais do Simples",
+        "Tributação mínima anual dos sócios",
+        "Tabelas, partilhas e transição de 2027"
+      ]
+    }
+  ]
+}

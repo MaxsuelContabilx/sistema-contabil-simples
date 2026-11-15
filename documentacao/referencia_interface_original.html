@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema Profissional de Planejamento Tributário & DRE | EC 132/23 & LC 214/25</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f7ff',
+              100: '#e0effe',
+              500: '#0284c7',
+              600: '#0369a1',
+              700: '#035485',
+              900: '#0c2a4a',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    .dark ::-webkit-scrollbar-thumb { background: #334155; }
+    
+    @media print {
+      .no-print { display: none !important; }
+      .print-only { display: block !important; }
+      body { background: white !important; color: black !important; }
+      .card-print { border: 1px solid #ccc !important; shadow: none !important; }
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 min-h-full flex flex-col transition-colors duration-200">
+
+  <!-- TOP HEADER -->
+  <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-50 no-print">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="bg-brand-600 p-2 rounded-lg text-white font-bold">
+          <i class="fa-solid me-1 fa-calculator text-xl"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold tracking-tight flex items-center gap-2">
+            TaxPlan <span class="text-xs bg-brand-500/30 text-brand-300 border border-brand-500/50 px-2 py-0.5 rounded-full font-mono">Pro v2026</span>
+          </h1>
+          <p class="text-xs text-slate-400">Planejamento Tributário, DRE & Reforma (EC 132/23 | LC 214/25)</p>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-3">
+        <!-- Theme Toggle -->
+        <button id="themeToggle" class="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition">
+          <i class="fa-solid fa-moon dark:hidden"></i>
+          <i class="fa-solid fa-sun hidden dark:block text-amber-400"></i>
+        </button>
+
+        <!-- Print / Export Button -->
+        <button onclick="window.print()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3 py-2 rounded-lg font-medium border border-slate-700 flex items-center gap-2 transition">
+          <i class="fa-solid fa-print"></i> Exportar Relatório
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN WRAPPER -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- NAVIGATION TABS -->
+    <div class="flex border-b border-slate-200 dark:border-slate-800 overflow-x-auto no-print space-x-1">
+      <button onclick="switchTab('cadastro')" id="tab-cadastro" class="tab-btn active-tab px-4 py-2.5 text-sm font-semibold border-b-2 border-brand-500 text-brand-600 dark:text-brand-400 flex items-center gap-2 whitespace-nowrap">
+        <i class="fa-solid fa-sliders"></i> Cadastro & Dados
+      </button>
+      <button onclick="switchTab('dre')" id="tab-dre" class="tab-btn px-4 py-2.5 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 flex items-center gap-2 whitespace-nowrap">
+        <i class="fa-solid fa-table-list"></i> DRE Comparativa
+      </button>
+      <button onclick="switchTab('precificacao')" id="tab-precificacao" class="tab-btn px-4 py-2.5 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 flex items-center gap-2 whitespace-nowrap">
+        <i class="fa-solid fa-tags"></i> Formação de Preços & Margem
+      </button>
+      <button onclick="switchTab('reforma')" id="tab-reforma" class="tab-btn px-4 py-2.5 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 flex items-center gap-2 whitespace-nowrap">
+        <i class="fa-solid fa-chart-line"></i> Transição Reforma (2026-2033)
+      </button>
+      <button onclick="switchTab('relatorio')" id="tab-relatorio" class="tab-btn px-4 py-2.5 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 flex items-center gap-2 whitespace-nowrap">
+        <i class="fa-solid fa-file-contract"></i> Diagnóstico & Parecer
+      </button>
+    </div>
+
+    <!-- QUICK EXECUTIVE KPI SUMMARY HEADER -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 no-print">
+      <div class="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative overflow-hidden">
+        <div class="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Regime Mais Vantajoso</div>
+        <div id="kpi-best-regime" class="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-2">
+          Calculando...
+        </div>
+        <div id="kpi-economy" class="text-xs text-slate-500 dark:text-slate-400 mt-1">Economia estimada: R$ 0,00</div>
+        <div class="absolute -right-2 -bottom-2 opacity-10 text-emerald-600 text-6xl"><i class="fa-solid fa-award"></i></div>
+      </div>
+
+      <div class="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+        <div class="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Menor Carga Tributária Efetiva</div>
+        <div id="kpi-effective-tax" class="text-xl font-bold text-slate-800 dark:text-slate-100 mt-1">
+          0.00%
+        </div>
+        <div id="kpi-tax-amount" class="text-xs text-slate-500 dark:text-slate-400 mt-1">R$ 0,00 / ano em impostos</div>
+      </div>
+
+      <div class="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+        <div class="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Lucro Líquido Máximo</div>
+        <div id="kpi-net-profit" class="text-xl font-bold text-slate-800 dark:text-slate-100 mt-1">
+          R$ 0,00
+        </div>
+        <div id="kpi-net-margin" class="text-xs text-emerald-500 font-medium mt-1">Margem Líquida: 0.0%</div>
+      </div>
+
+      <div class="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+        <div class="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Ano da Transição Selecionado</div>
+        <div id="kpi-selected-year" class="text-xl font-bold text-brand-600 dark:text-brand-400 mt-1">
+          2026 (Ano Teste 1%)
+        </div>
+        <div class="text-xs text-slate-500 dark:text-slate-400 mt-1">IBS + CBS: 1% Compensável</div>
+      </div>
+    </div>
+
+    <!-- TAB 1: CADASTRO & PARÂMETROS -->
+    <section id="sec-cadastro" class="tab-content space-y-6">
+      <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+        <h2 class="text-lg font-bold border-b border-slate-100 dark:border-slate-700 pb-3 mb-4 flex items-center gap-2">
+          <i class="fa-solid fa-building text-brand-500"></i> Perfil e Parâmetros Operacionais da Empresa
+        </h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <!-- Empresa Info -->
+          <div>
+            <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Razão Social / Nome Fantasia</label>
+            <input type="text" id="inp-razao" value="Empresa Exemplo LTDA" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-brand-500">
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Setor Econômico</label>
+            <select id="inp-setor" onchange="recalculateAll()" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-brand-500">
+              <option value="comercio">Comércio Geral</option>
+              <option value="industria">Indústria</option>
+              <option value="servicos_geral">Serviços em Geral (Anexo III ou V)</option>
+              <option value="servicos_presumido32">Serviços Regulamentados (Presunção 32%)</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Ano de Análise da Reforma</label>
+            <select id="inp-ano-reforma" onchange="recalculateAll()" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-sm font-semibold text-brand-600 focus:ring-2 focus:ring-brand-500">
+              <option value="2026">2026 (Início Transição: CBS 0,9% / IBS 0,1%)</option>
+              <option value="2027">2027 (CBS Plena 8,8% / Extinção PIS/Cofins)</option>
+              <option value="2028">2028 (Transição CBS / IBS mantido)</option>
+              <option value="2029">2029 (IBS 10% / ICMS-ISS 90%)</option>
+              <option value="2030">2030 (IBS 20% / ICMS-ISS 80%)</option>
+              <option value="2033">2033 (Regime Definitivo: IVA Dual Pleno 26,5%)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mt-6">
+          <!-- Receita & Faturamento -->
+          <div class="space-y-4 border-t md:border-t-0 md:border-r border-slate-200 dark:border-slate-700 md:pr-4 pt-4 md:pt-0">
+            <h3 class="text-sm font-bold text-brand-600 dark:text-brand-400 flex items-center gap-2">
+              <i class="fa-solid fa-money-bill-wave"></i> Receita & Vendas
+            </h3>
+            
+            <div>
+              <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Receita Bruta Anual Estimada (R$)</label>
+              <input type="number" id="inp-receita-anual" value="3600000" step="10000" onchange="recalculateAll()" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-sm font-bold text-slate-800 dark:text-slate-100">
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">RBT12 Acumulado (Últimos 12m)</label>
+              <input type="number" id="inp-rbt12" value="3600000" step="10000" onchange="recalculateAll()" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-sm">
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">% Vendas B2B (Contribuintes)</label>
+              <input type="range" id="inp-perc-b2b" min="0" max="100" value="70" oninput="document.getElementById('lbl-b2b').innerText = this.value + '%'; recalculateAll()" class="w-full">
+              <div class="flex justify-between text-xs text-slate-500">
+                <span>B2C: <b id="lbl-b2c">30%</b></span>
+                <span>B2B: <b id="lbl-b2b">70%</b></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Custos & Insumos -->
+          <div class="space-y-4 border-t md:border-t-0 md:border-r border-slate-200 dark:border-slate-700 md:pr-4 pt-4 md:pt-0">
+            <h3 class="text-sm font-bold text-brand-600 dark:text-brand-400 flex items-center gap-2">
+              <i class="fa-solid fa-boxes-packing"></i> Compras & Custos
+            </h3>
+
+            <div>
+              <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">CMV / CPV / Insumos (Anual R$)</label>
+              <input type="number" id="inp-cmv" value="1800000" step="10000" onchange="recalculateAll()" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-sm">
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">% Compras de Fornecedores Simples</label>
+              <input type="range" id="inp-forn-simples" min="0" max="100" value="30" oninput="document.getElementById('lbl-forn-simples').innerText = this.value + '%'; recalculateAll()" class="w-full">
+              <span class="text-xs text-slate-500">Fornecedores Simples: <b id="lbl-forn-simples">30%</b></span>
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Serviços/Energia/Frete Créditáveis (R$)</label>
+              <input type="number" id="inp-desp-creditaveis" value="240000" step="5000" onchange="recalculateAll()" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-sm">
+            </div>
+          </div>
+
+          <!-- Folha & Pessoal -->
+          <div class="space-y-4 border-t md:border-t-0 md:border-r border-slate-200 dark:border-slate-700 md:pr-4 pt-4 md:pt-0">
+            <h3 class="text-sm font-bold text-brand-600 dark:text-brand-400 flex items-center gap-2">
+              <i class="fa-solid fa-users"></i> Pessoal & Folha
+            </h3>
+
+            <div>
+              <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Folha Salarial + Encargos (Anual R$)</label>
+              <input type="number" id="inp-folha" value="600000" step="10000" onchange="recalculateAll()" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-sm">
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Pró-Labore Anual (R$)</label>
+              <input type="number" id="inp-prolabore" value="120000" step="5000" onchange="recalculateAll()" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-sm">
+            </div>
+
+            <div class="p-2.5 bg-slate-100 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
+              <div class="text-xs font-medium text-slate-500">Fator R Calculado (Simples):</div>
+              <div id="lbl-fator-r" class="text-base font-bold text-slate-800 dark:text-slate-200">20.00%</div>
+              <div id="lbl-fator-r-status" class="text-xs text-amber-500">Aplica-se Anexo V (Fator R &lt; 28%)</div>
+            </div>
+          </div>
+
+          <!-- Despesas Operacionais Fixas -->
+          <div class="space-y-4 border-t md:border-t-0 pt-4 md:pt-0">
+            <h3 class="text-sm font-bold text-brand-600 dark:text-brand-400 flex items-center gap-2">
+              <i class="fa-solid fa-file-invoice-dollar"></i> Despesas Fixas & Outros
+            </h3>
+
+            <div>
+              <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Despesas Fixas Não-Créditáveis (R$)</label>
+              <input type="number" id="inp-desp-fixas" value="180000" step="5000" onchange="recalculateAll()" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-sm">
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Alíquota Média ICMS/ISS Atual (%)</label>
+              <input type="number" id="inp-aliq-icms-iss" value="12" step="0.5" onchange="recalculateAll()" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-sm">
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Opção do Simples pelo IBS/CBS Regular?</label>
+              <select id="inp-simples-ibs-opt" onchange="recalculateAll()" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-sm">
+                <option value="nao">Não (Mantém IBS/CBS unificado no DAS)</option>
+                <option value="sim">Sim (Recolhe IBS/CBS por fora para repassar crédito B2B)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: DRE COMPARATIVA side-by-side -->
+    <section id="sec-dre" class="tab-content hidden space-y-6">
+      <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 dark:border-slate-700 pb-4 mb-4">
+          <div>
+            <h2 class="text-lg font-bold flex items-center gap-2">
+              <i class="fa-solid fa-scale-balanced text-brand-500"></i> DRE Comparativa Inter-Regimes (Anual)
+            </h2>
+            <p class="text-xs text-slate-500">Demonstração do Resultado do Exercício e carga tributária efetiva para cada regime fiscal.</p>
+          </div>
+          <div class="text-xs bg-brand-50 dark:bg-slate-900 border border-brand-200 dark:border-slate-700 p-2 rounded-lg text-brand-700 dark:text-brand-300 font-mono">
+            Ano Base Reforma: <span id="lbl-dre-ano-ref" class="font-bold">2026</span>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left">
+            <thead class="bg-slate-100 dark:bg-slate-900/80 text-slate-700 dark:text-slate-300 uppercase font-semibold border-b border-slate-200 dark:border-slate-700">
+              <tr>
+                <th class="p-3">Rubrica Contábil / Financeira</th>
+                <th class="p-3 text-right">Simples Nacional</th>
+                <th class="p-3 text-right">Lucro Presumido</th>
+                <th class="p-3 text-right">Lucro Real</th>
+                <th class="p-3 text-right bg-brand-50/50 dark:bg-brand-950/20 text-brand-600 dark:text-brand-400">Pós-Reforma (Transição)</th>
+              </tr>
+            </thead>
+            <tbody id="tbl-dre-body" class="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
+              <!-- JS Populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- CHART DRE COMPARISON -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+          <h3 class="text-xs font-bold uppercase text-slate-500 mb-3">Composição dos Tributos (R$)</h3>
+          <div class="h-64">
+            <canvas id="chartTributosRegime"></canvas>
+          </div>
+        </div>
+        <div class="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+          <h3 class="text-xs font-bold uppercase text-slate-500 mb-3">Lucro Líquido vs Margem Líquida (%)</h3>
+          <div class="h-64">
+            <canvas id="chartLucroRegime"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: FORMAÇÃO DE PREÇOS E MARGEM -->
+    <section id="sec-precificacao" class="tab-content hidden space-y-6">
+      <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+        <h2 class="text-lg font-bold border-b border-slate-100 dark:border-slate-700 pb-3 mb-4 flex items-center gap-2">
+          <i class="fa-solid fa-calculator text-brand-500"></i> Formação de Preço de Venda (Target Price) & Ponto de Equilíbrio
+        </h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          <div class="p-4 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
+            <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Margem Líquida Pretendida (%)</label>
+            <input type="number" id="inp-target-margin" value="15" step="0.5" onchange="recalculateAll()" class="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded p-2 text-sm font-bold text-brand-600">
+            <p class="text-[11px] text-slate-400 mt-1">Meta de lucro líquido final sobre o faturamento.</p>
+          </div>
+
+          <div class="p-4 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
+            <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Custo Direto do Produto/Serviço (R$)</label>
+            <input type="number" id="inp-unit-cost" value="100" step="1" onchange="recalculateAll()" class="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded p-2 text-sm font-bold">
+            <p class="text-[11px] text-slate-400 mt-1">Custo unitário de aquisição ou fabricação.</p>
+          </div>
+
+          <div class="p-4 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
+            <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Despesas Variáveis de Venda (%)</label>
+            <input type="number" id="inp-sales-expenses" value="5" step="0.5" onchange="recalculateAll()" class="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded p-2 text-sm font-bold">
+            <p class="text-[11px] text-slate-400 mt-1">Comissões, taxas de cartão, fretes de entrega.</p>
+          </div>
+        </div>
+
+        <!-- PRICING COMPARISON TABLE -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left">
+            <thead class="bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 uppercase font-semibold">
+              <tr>
+                <th class="p-3">Indicador de Preço & Ponto de Equilíbrio</th>
+                <th class="p-3 text-right">Simples Nacional</th>
+                <th class="p-3 text-right">Lucro Presumido</th>
+                <th class="p-3 text-right">Lucro Real</th>
+                <th class="p-3 text-right bg-brand-50/50 dark:bg-brand-950/20 text-brand-600">Pós-Reforma</th>
+              </tr>
+            </thead>
+            <tbody id="tbl-pricing-body" class="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
+              <!-- JS Populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- SENSITIVIDADE B2B VS B2C -->
+      <div class="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+        <h3 class="text-sm font-bold mb-2 flex items-center gap-2">
+          <i class="fa-solid fa-handshake-simple text-brand-500"></i> Competitividade B2B: Atratividade de Crédito ao Cliente
+        </h3>
+        <p class="text-xs text-slate-500 mb-4">No ambiente pós-reforma (IBS/CBS), clientes B2B preferem fornecedores que gerem créditos tributários integrais. Fornecedores no Simples que não optarem pelo recolhimento regular repassam menos créditos aos clientes.</p>
+
+        <div id="b2b-competitiveness-card" class="p-4 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-xs space-y-2">
+          <!-- JS dynamic statement -->
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: TRANSIÇÃO DA REFORMA TRIBUTÁRIA -->
+    <section id="sec-reforma" class="tab-content hidden space-y-6">
+      <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+        <h2 class="text-lg font-bold border-b border-slate-100 dark:border-slate-700 pb-3 mb-4 flex items-center gap-2">
+          <i class="fa-solid fa-timeline text-brand-500"></i> Cronograma Geral da Transição Tributária (2026 - 2033)
+        </h2>
+
+        <div class="h-72 mb-6">
+          <canvas id="chartEvolucaoReforma"></canvas>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+          <div class="p-4 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
+            <span class="font-bold text-slate-700 dark:text-slate-300 block mb-1">Fase 1: 2026 (Ano Teste)</span>
+            <p class="text-slate-500">Incidência de 0,9% CBS e 0,1% IBS (Total 1%). Este valor é totalmente compensável com o PIS/Cofins ou outros tributos federais/estaduais.</p>
+          </div>
+
+          <div class="p-4 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
+            <span class="font-bold text-slate-700 dark:text-slate-300 block mb-1">Fase 2: 2027 - 2028 (CBS Plena)</span>
+            <p class="text-slate-500">Extinção total do PIS e da Cofins. CBS entra em vigor com alíquota estimada em 8,8%. Isenção de IPI (exceto ZFM).</p>
+          </div>
+
+          <div class="p-4 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
+            <span class="font-bold text-slate-700 dark:text-slate-300 block mb-1">Fase 3: 2029 - 2033 (IBS & IVA Pleno)</span>
+            <p class="text-slate-500">Redução gradual do ICMS e ISS à razão de 1/10 por ano. Elevação correspondente do IBS até alíquota combinada de ~26,5% em 2033.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 5: DIAGNÓSTICO & PARECER CONSULTIVO -->
+    <section id="sec-relatorio" class="tab-content hidden space-y-6">
+      <div id="report-printable" class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-8 space-y-6 card-print">
+        
+        <!-- REPORT HEADER -->
+        <div class="border-b-2 border-slate-800 pb-4 flex justify-between items-end">
+          <div>
+            <h1 class="text-2xl font-bold text-slate-900 dark:text-white uppercase tracking-tight">Relatório de Planejamento Tributário & DRE</h1>
+            <p class="text-xs text-slate-500">Análise de enquadramento fiscal, margens gerenciais e impactos da EC 132/23 e LC 214/25</p>
+          </div>
+          <div class="text-right text-xs">
+            <div class="font-bold text-slate-800 dark:text-slate-200" id="rep-company-name">Empresa Exemplo LTDA</div>
+            <div class="text-slate-500" id="rep-date">Data: --/--/----</div>
+          </div>
+        </div>
+
+        <!-- EXECUTIVE RECOMMENDATION BOX -->
+        <div class="p-5 rounded-xl bg-slate-900 text-white space-y-2">
+          <div class="text-xs font-semibold text-brand-400 uppercase tracking-wider"><i class="fa-solid fa-lightbulb me-1"></i> Recomendação Estratégica Final</div>
+          <div id="rep-recommendation-title" class="text-xl font-bold text-emerald-400">
+            Opção Recomendada: LUCRO PRESUMIDO
+          </div>
+          <p id="rep-recommendation-desc" class="text-xs text-slate-300 leading-relaxed">
+            Com base nos parâmetros informados, o Lucro Presumido apresenta a menor carga tributária efetiva e maior geração de caixa.
+          </p>
+        </div>
+
+        <!-- COMPARATIVE METRICS -->
+        <div class="grid grid-cols-3 gap-4 text-center font-mono text-xs">
+          <div class="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border">
+            <div class="text-slate-400 uppercase text-[10px]">Carga Efetiva Simples</div>
+            <div id="rep-tax-simples" class="text-sm font-bold mt-1">0.0%</div>
+          </div>
+          <div class="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border">
+            <div class="text-slate-400 uppercase text-[10px]">Carga Efetiva Presumido</div>
+            <div id="rep-tax-presumido" class="text-sm font-bold mt-1">0.0%</div>
+          </div>
+          <div class="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border">
+            <div class="text-slate-400 uppercase text-[10px]">Carga Efetiva Real</div>
+            <div id="rep-tax-real" class="text-sm font-bold mt-1">0.0%</div>
+          </div>
+        </div>
+
+        <!-- STRATEGIC ACTION PLAN -->
+        <div class="space-y-3">
+          <h3 class="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase border-b pb-1">Plano de Ação em 5 Passos para a Empresa</h3>
+          <ol id="rep-action-plan" class="list-decimal list-inside text-xs text-slate-600 dark:text-slate-300 space-y-2">
+            <!-- JS populated -->
+          </ol>
+        </div>
+
+        <!-- DISCLAIMER LEGAL -->
+        <div class="p-3 bg-slate-100 dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800 text-[10px] text-slate-500 leading-tight">
+          <b>Ressalva Legal & Metodológica:</b> Este documento é uma simulação gerencial elaborada com base na legislação tributária vigente (LC 123/06, Lei 9.249/95, Lei 9.430/96, EC 132/23, LC 214/25). Os resultados não substituem a apuração contábil/fiscal oficial nem dispensam a validação individualizada de regimes especiais, diferimentos e particularidades estaduais/municipais.
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="bg-slate-900 text-slate-400 text-xs py-4 border-t border-slate-800 mt-auto no-print">
+    <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-2">
+      <div>TaxPlan Pro &copy; 2026 — Planejamento Tributário & DRE Gerencial</div>
+      <div class="flex items-center space-x-4">
+        <span><i class="fa-solid fa-shield-halved text-emerald-500 me-1"></i> EC 132/23 & LC 214/25 Compliance</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- SCRIPTING & ENGINE LÓGICO -->
+  <script>
+    // --- GLOBAL STATE & CONFIGS ---
+    const STATE = {
+      razao: "Empresa Exemplo LTDA",
+      setor: "comercio",
+      anoReforma: "2026",
+      receitaAnual: 3600000,
+      rbt12: 3600000,
+      percB2B: 70,
+      cmv: 1800000,
+      percFornSimples: 30,
+      despCreditaveis: 240000,
+      folha: 600000,
+      prolabore: 120000,
+      despFixas: 180000,
+      aliqIcmsIss: 12,
+      simplesIbsOpt: "nao",
+      targetMargin: 15,
+      unitCost: 100,
+      salesExpenses: 5
+    };
+
+    let chartTributos = null;
+    let chartLucro = null;
+    let chartReforma = null;
+
+    // --- INITIALIZATION ---
+    window.addEventListener('DOMContentLoaded', () => {
+      // Theme setup
+      if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.documentElement.classList.add('dark');
+      }
+      
+      document.getElementById('themeToggle').addEventListener('click', () => {
+        document.documentElement.classList.toggle('dark');
+        recalculateAll();
+      });
+
+      recalculateAll();
+    });
+
+    // --- TAB NAVIGATION ---
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.tab-btn').forEach(el => {
+        el.classList.remove('border-brand-500', 'text-brand-600', 'dark:text-brand-400');
+        el.classList.add('border-transparent', 'text-slate-500');
+      });
+
+      document.getElementById('sec-' + tabId).classList.remove('hidden');
+      const activeBtn = document.getElementById('tab-' + tabId);
+      activeBtn.classList.remove('border-transparent', 'text-slate-500');
+      activeBtn.classList.add('border-brand-500', 'text-brand-600', 'dark:text-brand-400');
+
+      // Re-render charts on tab switch if necessary
+      if (tabId === 'dre') renderDreCharts();
+      if (tabId === 'reforma') renderReformaChart();
+    }
+
+    // --- CORE ENGINE CALCULATIONS ---
+    function recalculateAll() {
+      readInputs();
+
+      // Calc Fator R
+      const fatorR = STATE.rbt12 > 0 ? ((STATE.folha + STATE.prolabore) / STATE.rbt12) * 100 : 0;
+      document.getElementById('lbl-fator-r').innerText = fatorR.toFixed(2) + '%';
+      const lblStatus = document.getElementById('lbl-fator-r-status');
+      if (STATE.setor.includes('servicos')) {
+        if (fatorR >= 28) {
+          lblStatus.innerText = "Sujeito ao Anexo III (Fator R ≥ 28%) - Alíquota Menor";
+          lblStatus.className = "text-xs text-emerald-500 font-semibold";
+        } else {
+          lblStatus.innerText = "Sujeito ao Anexo V (Fator R < 28%) - Carga Superior";
+          lblStatus.className = "text-xs text-amber-500 font-semibold";
+        }
+      } else {
+        lblStatus.innerText = "Não aplicável ao setor selecionado";
+        lblStatus.className = "text-xs text-slate-400";
+      }
+
+      // Compute Regimes
+      const resSimples = calcSimplesNacional();
+      const resPresumido = calcLucroPresumido();
+      const resReal = calcLucroReal();
+      const resReforma = calcPosReforma();
+
+      // Render UI Components
+      updateKPIs(resSimples, resPresumido, resReal, resReforma);
+      renderDRETable(resSimples, resPresumido, resReal, resReforma);
+      renderPricingTable(resSimples, resPresumido, resReal, resReforma);
+      renderB2BCompetitiveness(resSimples, resReforma);
+      renderReport(resSimples, resPresumido, resReal, resReforma);
+
+      renderDreCharts(resSimples, resPresumido, resReal, resReforma);
+      renderReformaChart();
+    }
+
+    function readInputs() {
+      STATE.razao = document.getElementById('inp-razao').value;
+      STATE.setor = document.getElementById('inp-setor').value;
+      STATE.anoReforma = document.getElementById('inp-ano-reforma').value;
+      STATE.receitaAnual = parseFloat(document.getElementById('inp-receita-anual').value) || 0;
+      STATE.rbt12 = parseFloat(document.getElementById('inp-rbt12').value) || 0;
+      STATE.percB2B = parseFloat(document.getElementById('inp-perc-b2b').value) || 0;
+      STATE.cmv = parseFloat(document.getElementById('inp-cmv').value) || 0;
+      STATE.percFornSimples = parseFloat(document.getElementById('inp-forn-simples').value) || 0;
+      STATE.despCreditaveis = parseFloat(document.getElementById('inp-desp-creditaveis').value) || 0;
+      STATE.folha = parseFloat(document.getElementById('inp-folha').value) || 0;
+      STATE.prolabore = parseFloat(document.getElementById('inp-prolabore').value) || 0;
+      STATE.despFixas = parseFloat(document.getElementById('inp-desp-fixas').value) || 0;
+      STATE.aliqIcmsIss = parseFloat(document.getElementById('inp-aliq-icms-iss').value) || 0;
+      STATE.simplesIbsOpt = document.getElementById('inp-simples-ibs-opt').value;
+      STATE.targetMargin = parseFloat(document.getElementById('inp-target-margin').value) || 0;
+      STATE.unitCost = parseFloat(document.getElementById('inp-unit-cost').value) || 0;
+      STATE.salesExpenses = parseFloat(document.getElementById('inp-sales-expenses').value) || 0;
+
+      document.getElementById('lbl-b2b').innerText = STATE.percB2B + '%';
+      document.getElementById('lbl-b2c').innerText = (100 - STATE.percB2B) + '%';
+      document.getElementById('lbl-forn-simples').innerText = STATE.percFornSimples + '%';
+      document.getElementById('lbl-dre-ano-ref').innerText = STATE.anoReforma;
+    }
+
+    // --- SIMPLES NACIONAL ENGINE ---
+    function calcSimplesNacional() {
+      const R = STATE.receitaAnual;
+      const rbt12 = STATE.rbt12;
+      const fatorR = rbt12 > 0 ? (STATE.folha + STATE.prolabore) / rbt12 : 0;
+
+      // Select Annex & Nominal Rates
+      let aliqNominal = 0.095; 
+      let deducao = 13860;
+
+      if (STATE.setor === 'comercio') {
+        // Anexo I
+        if (rbt12 <= 180000) { aliqNominal = 0.04; deducao = 0; }
+        else if (rbt12 <= 360000) { aliqNominal = 0.073; deducao = 5940; }
+        else if (rbt12 <= 720000) { aliqNominal = 0.095; deducao = 13860; }
+        else if (rbt12 <= 1800000) { aliqNominal = 0.107; deducao = 22500; }
+        else if (rbt12 <= 3600000) { aliqNominal = 0.143; deducao = 87300; }
+        else { aliqNominal = 0.19; deducao = 378000; }
+      } else if (STATE.setor === 'industria') {
+        // Anexo II
+        if (rbt12 <= 180000) { aliqNominal = 0.045; deducao = 0; }
+        else if (rbt12 <= 360000) { aliqNominal = 0.078; deducao = 5940; }
+        else if (rbt12 <= 720000) { aliqNominal = 0.10; deducao = 13860; }
+        else if (rbt12 <= 1800000) { aliqNominal = 0.112; deducao = 22500; }
+        else if (rbt12 <= 3600000) { aliqNominal = 0.147; deducao = 85500; }
+        else { aliqNominal = 0.30; deducao = 720000; }
+      } else {
+        // Serviços: Anexo III or V based on Fator R
+        const usaAnexoIII = (fatorR >= 0.28) || (STATE.setor === 'servicos_geral');
+        if (usaAnexoIII) {
+          if (rbt12 <= 180000) { aliqNominal = 0.06; deducao = 0; }
+          else if (rbt12 <= 360000) { aliqNominal = 0.112; deducao = 9360; }
+          else if (rbt12 <= 720000) { aliqNominal = 0.135; deducao = 17640; }
+          else if (rbt12 <= 1800000) { aliqNominal = 0.16; deducao = 35640; }
+          else if (rbt12 <= 3600000) { aliqNominal = 0.21; deducao = 125640; }
+          else { aliqNominal = 0.33; deducao = 648000; }
+        } else {
+          // Anexo V
+          if (rbt12 <= 180000) { aliqNominal = 0.155; deducao = 0; }
+          else if (rbt12 <= 360000) { aliqNominal = 0.18; deducao = 4500; }
+          else if (rbt12 <= 720000) { aliqNominal = 0.195; deducao = 9900; }
+          else if (rbt12 <= 1800000) { aliqNominal = 0.205; deducao = 17100; }
+          else if (rbt12 <= 3600000) { aliqNominal = 0.23; deducao = 62100; }
+          else { aliqNominal = 0.305; deducao = 540000; }
+        }
+      }
+
+      let aliqEfetiva = rbt12 > 0 ? ((rbt12 * aliqNominal) - deducao) / rbt12 : aliqNominal;
+      if (aliqEfetiva < 0.04) aliqEfetiva = 0.04;
+
+      // Sublimite Check (R$ 3.6M)
+      let impostoDas = R * aliqEfetiva;
+      let icmsIssFora = 0;
+
+      if (rbt12 > 3600000) {
+        // Exceeded sublimit: ICMS/ISS paid out of DAS
+        icmsIssFora = R * (STATE.aliqIcmsIss / 100);
+      }
+
+      const totalTributos = impostoDas + icmsIssFora;
+      const receitaLiquida = R - totalTributos;
+      const lucroBruto = receitaLiquida - STATE.cmv;
+      const despesasOperacionais = STATE.folha + STATE.prolabore + STATE.despCreditaveis + STATE.despFixas;
+      const lucroLíquido = lucroBruto - despesasOperacionais;
+
+      return {
+        nome: "Simples Nacional",
+        receitaBruta: R,
+        tributos: totalTributos,
+        aliqEfetiva: R > 0 ? (totalTributos / R) * 100 : 0,
+        receitaLiquida: receitaLiquida,
+        cmv: STATE.cmv,
+        lucroBruto: lucroBruto,
+        despesas: despesasOperacionais,
+        lucroLíquido: lucroLíquido,
+        margemLiquida: R > 0 ? (lucroLíquido / R) * 100 : 0
+      };
+    }
+
+    // --- LUCRO PRESUMIDO ENGINE ---
+    function calcLucroPresumido() {
+      const R = STATE.receitaAnual;
+
+      // Presumption Rates
+      let presIRPJ = 0.08;
+      let presCSLL = 0.12;
+
+      if (STATE.setor === 'servicos_presumido32' || STATE.setor === 'servicos_geral') {
+        presIRPJ = 0.32;
+        presCSLL = 0.32;
+      } else if (STATE.setor === 'industria') {
+        presIRPJ = 0.08;
+        presCSLL = 0.12;
+      }
+
+      // Base Calculation
+      const baseIRPJ = R * presIRPJ;
+      const baseCSLL = R * presCSLL;
+
+      // Taxes Calculation
+      let irpj = baseIRPJ * 0.15;
+      // Adicional IRPJ (10% over R$ 60k/quarter or 240k/year)
+      if (baseIRPJ > 240000) {
+        irpj += (baseIRPJ - 240000) * 0.10;
+      }
+
+      const csll = baseCSLL * 0.09;
+      const pis = R * 0.0065; // Cumulativo
+      const cofins = R * 0.03;  // Cumulativo
+      const icmsIss = R * (STATE.aliqIcmsIss / 100);
+
+      const totalTributos = irpj + csll + pis + cofins + icmsIss;
+      const receitaLiquida = R - totalTributos;
+      const lucroBruto = receitaLiquida - STATE.cmv;
+      const despesasOperacionais = STATE.folha + STATE.prolabore + STATE.despCreditaveis + STATE.despFixas;
+      const lucroLíquido = lucroBruto - despesasOperacionais;
+
+      return {
+        nome: "Lucro Presumido",
+        receitaBruta: R,
+        tributos: totalTributos,
+        aliqEfetiva: R > 0 ? (totalTributos / R) * 100 : 0,
+        receitaLiquida: receitaLiquida,
+        cmv: STATE.cmv,
+        lucroBruto: lucroBruto,
+        despesas: despesasOperacionais,
+        lucroLíquido: lucroLíquido,
+        margemLiquida: R > 0 ? (lucroLíquido / R) * 100 : 0
+      };
+    }
+
+    // --- LUCRO REAL ENGINE ---
+    function calcLucroReal() {
+      const R = STATE.receitaAnual;
+
+      // PIS/Cofins Não-Cumulativo (1.65% & 7.6%) with credits on purchases & credit-generating expenses
+      const pisDebito = R * 0.0165;
+      const cofinsDebito = R * 0.076;
+
+      // Base of credits: CMV + credit-generating expenses
+      // Discount portion bought from Simples (credit limited or full depending on rules)
+      const comprasCréditáveis = STATE.cmv + STATE.despCreditaveis;
+      const pisCredito = comprasCréditáveis * 0.0165;
+      const cofinsCredito = comprasCréditáveis * 0.076;
+
+      const pisEfetivo = Math.max(0, pisDebito - pisCredito);
+      const cofinsEfetivo = Math.max(0, cofinsDebito - cofinsCredito);
+      const icmsIss = R * (STATE.aliqIcmsIss / 100);
+
+      // LAIR Accounting
+      const receitaLiquidaPreliminar = R - (pisEfetivo + cofinsEfetivo + icmsIss);
+      const lucroBruto = receitaLiquidaPreliminar - STATE.cmv;
+      const despesasOperacionais = STATE.folha + STATE.prolabore + STATE.despCreditaveis + STATE.despFixas;
+      const lair = lucroBruto - despesasOperacionais;
+
+      let irpj = 0;
+      let csll = 0;
+
+      if (lair > 0) {
+        irpj = lair * 0.15;
+        if (lair > 240000) {
+          irpj += (lair - 240000) * 0.10;
+        }
+        csll = lair * 0.09;
+      }
+
+      const totalTributos = pisEfetivo + cofinsEfetivo + icmsIss + irpj + csll;
+      const receitaLiquida = R - totalTributos;
+      const lucroLíquido = R - totalTributos - STATE.cmv - despesasOperacionais;
+
+      return {
+        nome: "Lucro Real",
+        receitaBruta: R,
+        tributos: totalTributos,
+        aliqEfetiva: R > 0 ? (totalTributos / R) * 100 : 0,
+        receitaLiquida: receitaLiquida,
+        cmv: STATE.cmv,
+        lucroBruto: R - totalTributos - STATE.cmv,
+        despesas: despesasOperacionais,
+        lucroLíquido: lucroLíquido,
+        margemLiquida: R > 0 ? (lucroLíquido / R) * 100 : 0
+      };
+    }
+
+    // --- POS-REFORMA ENGINE (IBS/CBS TRANSITION) ---
+    function calcPosReforma() {
+      const R = STATE.receitaAnual;
+      const ano = parseInt(STATE.anoReforma);
+
+      let aliqCbs = 0;
+      let aliqIbs = 0;
+      let aliqPisCofinsFactor = 1.0;
+      let aliqIcmsIssFactor = 1.0;
+
+      // Transition Rules according to EC 132/23 & LC 214/25
+      if (ano === 2026) {
+        aliqCbs = 0.009; // 0.9%
+        aliqIbs = 0.001; // 0.1%
+        aliqPisCofinsFactor = 1.0; // Fully offset against PIS/Cofins
+      } else if (ano === 2027 || ano === 2028) {
+        aliqCbs = 0.088; // CBS Standard
+        aliqIbs = 0.001;
+        aliqPisCofinsFactor = 0.0; // PIS/Cofins Extinct
+      } else if (ano >= 2029 && ano <= 2032) {
+        const anosTransicao = ano - 2028;
+        aliqPisCofinsFactor = 0.0;
+        aliqIcmsIssFactor = 1.0 - (anosTransicao * 0.10); // Redução de 10% ao ano
+        aliqCbs = 0.088;
+        aliqIbs = 0.177 * (anosTransicao * 0.10);
+      } else if (ano >= 2033) {
+        aliqPisCofinsFactor = 0.0;
+        aliqIcmsIssFactor = 0.0; // Extinct
+        aliqCbs = 0.088;
+        aliqIbs = 0.177; // Total 26.5% IVA Dual
+      }
+
+      // CBS/IBS Debits over Revenue
+      const cbsDebito = R * aliqCbs;
+      const ibsDebito = R * aliqIbs;
+
+      // CBS/IBS Credits over purchases & expenses
+      const comprasCréditáveis = STATE.cmv + STATE.despCreditaveis;
+      const cbsCredito = comprasCréditáveis * aliqCbs;
+      const ibsCredito = comprasCréditáveis * aliqIbs;
+
+      const cbsLiquida = Math.max(0, cbsDebito - cbsCredito);
+      const ibsLiquida = Math.max(0, ibsDebito - ibsCredito);
+
+      // Remaining Old Taxes
+      const pisCofinsAntigo = (R * 0.0365) * aliqPisCofinsFactor;
+      const icmsIssAntigo = (R * (STATE.aliqIcmsIss / 100)) * aliqIcmsIssFactor;
+
+      // Income Taxes (IRPJ/CSLL estimated on presunção base or real)
+      const baseIrpjCsll = R * 0.16;
+      const irpjCsll = baseIrpjCsll * 0.24;
+
+      const totalTributos = cbsLiquida + ibsLiquida + pisCofinsAntigo + icmsIssAntigo + irpjCsll;
+      const receitaLiquida = R - totalTributos;
+      const despesasOperacionais = STATE.folha + STATE.prolabore + STATE.despCreditaveis + STATE.despFixas;
+      const lucroLíquido = R - totalTributos - STATE.cmv - despesasOperacionais;
+
+      return {
+        nome: `Transição ${ano}`,
+        receitaBruta: R,
+        tributos: totalTributos,
+        aliqEfetiva: R > 0 ? (totalTributos / R) * 100 : 0,
+        receitaLiquida: receitaLiquida,
+        cmv: STATE.cmv,
+        lucroBruto: R - totalTributos - STATE.cmv,
+        despesas: despesasOperacionais,
+        lucroLíquido: lucroLíquido,
+        margemLiquida: R > 0 ? (lucroLíquido / R) * 100 : 0
+      };
+    }
+
+    // --- UI RENDER FUNCTIONS ---
+    function updateKPIs(simples, presumido, real, reforma) {
+      const regimes = [simples, presumido, real];
+      let best = regimes[0];
+
+      regimes.forEach(r => {
+        if (r.tributos < best.tributos) best = r;
+      });
+
+      // Calc potential economy vs worst regime
+      let worst = regimes[0];
+      regimes.forEach(r => {
+        if (r.tributos > worst.tributos) worst = r;
+      });
+
+      const economia = worst.tributos - best.tributos;
+
+      document.getElementById('kpi-best-regime').innerHTML = `${best.nome} <i class="fa-solid fa-circle-check text-emerald-500"></i>`;
+      document.getElementById('kpi-economy').innerText = `Economia de até: R$ ${economia.toLocaleString('pt-BR', {maximumFractionDigits:0})} / ano`;
+      document.getElementById('kpi-effective-tax').innerText = `${best.aliqEfetiva.toFixed(2)}%`;
+      document.getElementById('kpi-tax-amount').innerText = `R$ ${best.tributos.toLocaleString('pt-BR', {maximumFractionDigits:0})} em impostos/ano`;
+      document.getElementById('kpi-net-profit').innerText = `R$ ${best.lucroLíquido.toLocaleString('pt-BR', {maximumFractionDigits:0})}`;
+      document.getElementById('kpi-net-margin').innerText = `Margem Líquida: ${best.margemLiquida.toFixed(1)}%`;
+      document.getElementById('kpi-selected-year').innerText = `${STATE.anoReforma} (Transição)`;
+    }
+
+    function renderDRETable(simples, presumido, real, reforma) {
+      const fmt = num => num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+      const pct = num => num.toFixed(2) + '%';
+
+      const rows = [
+        { label: '1. Receita Bruta de Vendas', s: fmt(simples.receitaBruta), p: fmt(presumido.receitaBruta), r: fmt(real.receitaBruta), ref: fmt(reforma.receitaBruta), bold: true },
+        { label: '2. Total de Impostos & Deduções', s: fmt(-simples.tributos), p: fmt(-presumido.tributos), r: fmt(-real.tributos), ref: fmt(-reforma.tributos), color: 'text-rose-500' },
+        { label: '  • Carga Tributária Efetiva (%)', s: pct(simples.aliqEfetiva), p: pct(presumido.aliqEfetiva), r: pct(real.aliqEfetiva), ref: pct(reforma.aliqEfetiva), sub: true },
+        { label: '3. Receita Líquida', s: fmt(simples.receitaLiquida), p: fmt(presumido.receitaLiquida), r: fmt(real.receitaLiquida), ref: fmt(reforma.receitaLiquida), bold: true },
+        { label: '4. CMV / CPV / Custos Insumos', s: fmt(-simples.cmv), p: fmt(-presumido.cmv), r: fmt(-real.cmv), ref: fmt(-reforma.cmv) },
+        { label: '5. Lucro Bruto', s: fmt(simples.lucroBruto), p: fmt(presumido.lucroBruto), r: fmt(real.lucroBruto), ref: fmt(reforma.lucroBruto), bold: true },
+        { label: '6. Despesas Operacionais / Pessoal / Fixas', s: fmt(-simples.despesas), p: fmt(-presumido.despesas), r: fmt(-real.despesas), ref: fmt(-reforma.despesas) },
+        { label: '7. Lucro Líquido Gerencial', s: fmt(simples.lucroLíquido), p: fmt(presumido.lucroLíquido), r: fmt(real.lucroLíquido), ref: fmt(reforma.lucroLíquido), bold: true, highlight: true },
+        { label: '  • Margem Líquida (%)', s: pct(simples.margemLiquida), p: pct(presumido.margemLiquida), r: pct(real.margemLiquida), ref: pct(reforma.margemLiquida), sub: true }
+      ];
+
+      const tbody = document.getElementById('tbl-dre-body');
+      tbody.innerHTML = rows.map(r => `
+        <tr class="${r.highlight ? 'bg-emerald-50/50 dark:bg-emerald-950/30 font-bold' : ''} ${r.bold ? 'font-semibold' : ''}">
+          <td class="p-3 ${r.sub ? 'pl-6 text-slate-500 font-normal' : ''} ${r.color || ''}">${r.label}</td>
+          <td class="p-3 text-right">${r.s}</td>
+          <td class="p-3 text-right">${r.p}</td>
+          <td class="p-3 text-right">${r.r}</td>
+          <td class="p-3 text-right bg-brand-50/30 dark:bg-brand-950/10">${r.ref}</td>
+        </tr>
+      `).join('');
+    }
+
+    function renderPricingTable(simples, presumido, real, reforma) {
+      const fmt = num => num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+      // Target Price Calc: PV = Custo / (1 - %Tributos - %DespVendas - %MargemPretendida)
+      const calcPrice = (taxPct) => {
+        const denom = 1 - (taxPct / 100) - (STATE.salesExpenses / 100) - (STATE.targetMargin / 100);
+        return denom > 0 ? STATE.unitCost / denom : 0;
+      };
+
+      const pvSimples = calcPrice(simples.aliqEfetiva);
+      const pvPresumido = calcPrice(presumido.aliqEfetiva);
+      const pvReal = calcPrice(real.aliqEfetiva);
+      const pvReforma = calcPrice(reforma.aliqEfetiva);
+
+      // Break-Even Point: Fixed Costs / Contribution Margin Ratio
+      const calcBreakEven = (taxPct) => {
+        const mcRatio = 1 - (taxPct / 100) - (STATE.cmv / STATE.receitaAnual);
+        return mcRatio > 0 ? (STATE.folha + STATE.prolabore + STATE.despFixas) / mcRatio : 0;
+      };
+
+      const rows = [
+        { label: 'Custo Unitário Base', s: fmt(STATE.unitCost), p: fmt(STATE.unitCost), r: fmt(STATE.unitCost), ref: fmt(STATE.unitCost) },
+        { label: 'Preço de Venda Necessário (Target Price)', s: fmt(pvSimples), p: fmt(pvPresumido), r: fmt(pvReal), ref: fmt(pvReforma), bold: true },
+        { label: 'Markup sobre o Custo (%)', s: ((pvSimples/STATE.unitCost-1)*100).toFixed(1)+'%', p: ((pvPresumido/STATE.unitCost-1)*100).toFixed(1)+'%', r: ((pvReal/STATE.unitCost-1)*100).toFixed(1)+'%', ref: ((pvReforma/STATE.unitCost-1)*100).toFixed(1)+'%' },
+        { label: 'Ponto de Equilíbrio Operacional (Anual R$)', s: fmt(calcBreakEven(simples.aliqEfetiva)), p: fmt(calcBreakEven(presumido.aliqEfetiva)), r: fmt(calcBreakEven(real.aliqEfetiva)), ref: fmt(calcBreakEven(reforma.aliqEfetiva)) }
+      ];
+
+      const tbody = document.getElementById('tbl-pricing-body');
+      tbody.innerHTML = rows.map(r => `
+        <tr class="${r.bold ? 'font-bold bg-slate-50 dark:bg-slate-900' : ''}">
+          <td class="p-3">${r.label}</td>
+          <td class="p-3 text-right">${r.s}</td>
+          <td class="p-3 text-right">${r.p}</td>
+          <td class="p-3 text-right">${r.r}</td>
+          <td class="p-3 text-right bg-brand-50/30 dark:bg-brand-950/10">${r.ref}</td>
+        </tr>
+      `).join('');
+    }
+
+    function renderB2BCompetitiveness(simples, reforma) {
+      const card = document.getElementById('b2b-competitiveness-card');
+      const creditRepassSimples = STATE.simplesIbsOpt === 'sim' ? "integral (Opção pelo IBS/CBS regular)" : "parcial (Restrito à parcela paga no DAS)";
+
+      card.innerHTML = `
+        <div class="font-bold text-slate-800 dark:text-slate-200">Análise de Transmissão de Créditos B2B:</div>
+        <div>• <b>Vendas B2B (${STATE.percB2B}% do faturamento):</b> Seus clientes PJ poderão se creditar no regime regular da Reforma Tributária.</div>
+        <div>• <b>No Simples Nacional:</b> O repasse de créditos aos seus clientes será <b>${creditRepassSimples}</b>.</div>
+        <div>• <b>Impacto Comercial:</b> Caso seus clientes exijam 100% de crédito tributário nas compras, a manutenção no Simples sem a opção do IBS/CBS regular poderá exigir uma redução contratual de preço para compensar a perda do crédito do cliente.</div>
+      `;
+    }
+
+    function renderReport(simples, presumido, real, reforma) {
+      const fmt = num => num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+      document.getElementById('rep-company-name').innerText = STATE.razao;
+      document.getElementById('rep-date').innerText = 'Data: ' + new Date().toLocaleDateString('pt-BR');
+
+      const regimes = [simples, presumido, real];
+      let best = regimes[0];
+      regimes.forEach(r => { if (r.tributos < best.tributos) best = r; });
+
+      document.getElementById('rep-recommendation-title').innerText = `Opção Indicada: ${best.nome.toUpperCase()}`;
+      document.getElementById('rep-recommendation-desc').innerText = `
+        A opção pelo ${best.nome} proporciona a menor carga tributária anual estimada em ${fmt(best.tributos)} (alíquota efetiva de ${best.aliqEfetiva.toFixed(2)}%), gerando um Lucro Líquido final de ${fmt(best.lucroLíquido)} (margem líquida de ${best.margemLiquida.toFixed(1)}%).
+      `;
+
+      document.getElementById('rep-tax-simples').innerText = simples.aliqEfetiva.toFixed(2) + '%';
+      document.getElementById('rep-tax-presumido').innerText = presumido.aliqEfetiva.toFixed(2) + '%';
+      document.getElementById('rep-tax-real').innerText = real.aliqEfetiva.toFixed(2) + '%';
+
+      const actionPlan = [
+        `Validar com a contabilidade o enquadramento no regime de <b>${best.nome}</b> para o próximo exercício fiscal.`,
+        `Adequar os parâmetros do sistema ERP para segregação correta das alíquotas de tributos sobre vendas e insumos.`,
+        `Avaliar o perfil dos fornecedores (${STATE.percFornSimples}% estão no Simples) para maximizar tomada de créditos no pós-reforma.`,
+        `Revisar a planilha de precificação (Target Price) para garantir a margem líquida de ${STATE.targetMargin}%.`,
+        `Monitorar as regulamentações complementares da LC 214/2025 para ajustes na transição de ${STATE.anoReforma}.`
+      ];
+
+      document.getElementById('rep-action-plan').innerHTML = actionPlan.map(item => `<li class="pl-1">${item}</li>`).join('');
+    }
+
+    // --- CHARTS RENDERERS (CHART.JS) ---
+    function renderDreCharts(simples, presumido, real, reforma) {
+      if (!simples) {
+        simples = calcSimplesNacional();
+        presumido = calcLucroPresumido();
+        real = calcLucroReal();
+        reforma = calcPosReforma();
+      }
+
+      const isDark = document.documentElement.classList.contains('dark');
+      const textColor = isDark ? '#94a3b8' : '#475569';
+
+      // Chart 1: Tributos
+      const ctx1 = document.getElementById('chartTributosRegime')?.getContext('2d');
+      if (ctx1) {
+        if (chartTributos) chartTributos.destroy();
+        chartTributos = new Chart(ctx1, {
+          type: 'bar',
+          data: {
+            labels: ['Simples', 'Presumido', 'Real', `Transição ${STATE.anoReforma}`],
+            datasets: [{
+              label: 'Impostos Totais (R$)',
+              data: [simples.tributos, presumido.tributos, real.tributos, reforma.tributos],
+              backgroundColor: ['#0284c7', '#0ea5e9', '#38bdf8', '#818cf8']
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { ticks: { color: textColor } },
+              y: { ticks: { color: textColor } }
+            }
+          }
+        });
+      }
+
+      // Chart 2: Lucro
+      const ctx2 = document.getElementById('chartLucroRegime')?.getContext('2d');
+      if (ctx2) {
+        if (chartLucro) chartLucro.destroy();
+        chartLucro = new Chart(ctx2, {
+          type: 'bar',
+          data: {
+            labels: ['Simples', 'Presumido', 'Real', `Transição ${STATE.anoReforma}`],
+            datasets: [{
+              label: 'Lucro Líquido (R$)',
+              data: [simples.lucroLíquido, presumido.lucroLíquido, real.lucroLíquido, reforma.lucroLíquido],
+              backgroundColor: ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0']
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { ticks: { color: textColor } },
+              y: { ticks: { color: textColor } }
+            }
+          }
+        });
+      }
+    }
+
+    function renderReformaChart() {
+      const ctx = document.getElementById('chartEvolucaoReforma')?.getContext('2d');
+      if (!ctx) return;
+
+      const isDark = document.documentElement.classList.contains('dark');
+      const textColor = isDark ? '#94a3b8' : '#475569';
+
+      const anos = ['2026', '2027', '2028', '2029', '2030', '2031', '2032', '2033'];
+      
+      // Calculate tax trajectory over transition years
+      const originalYear = STATE.anoReforma;
+      const dataCarga = anos.map(y => {
+        STATE.anoReforma = y;
+        return calcPosReforma().aliqEfetiva;
+      });
+      STATE.anoReforma = originalYear;
+
+      if (chartReforma) chartReforma.destroy();
+      chartReforma = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: anos,
+          datasets: [{
+            label: 'Carga Tributária Efetiva Estimada (%)',
+            data: dataCarga,
+            borderColor: '#6366f1',
+            backgroundColor: 'rgba(99, 102, 241, 0.1)',
+            fill: true,
+            tension: 0.3,
+            pointRadius: 5
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: textColor } } },
+          scales: {
+            x: { ticks: { color: textColor } },
+            y: { ticks: { color: textColor } }
+          }
+        }
+      });
+    }
+  </script>
+</body>
+</html>
