@@ -1,4 +1,4 @@
-# Maxsuel — Planejamento tributário, versão 0.4 de revisão
+# Maxsuel — Planejamento tributário, versão 0.5 de revisão
 
 **Versão de testes com cenários financeiros condicionais; não homologada para apuração fiscal definitiva.**
 
@@ -34,3 +34,5 @@ python -m unittest discover -s tests -v
 Leia `documentacao/REVISAO_TECNICA.md` para regras implementadas, pendências, limitações das fontes e diferenças entre os dois códigos originais. `documentacao/inventario_fontes.json` contém os hashes dos uploads. O HTML original está em `documentacao/referencia_interface_original.html` apenas como referência de interface e recursos; seus cálculos não devem ser usados como versão validada.
 
 O menu comparativo abre os componentes em revisão. Não indica um vencedor enquanto a carga global e a elegibilidade não estiverem completas. As exportações JSON/HTML incluem as entradas do cálculo, fundamento e pendências. O módulo de folha permanece legado e não foi validado nesta etapa.
+
+A versão 0.5 mostra percentuais e bases de presunção, permite o histórico dos primeiros meses do Simples e destaca o melhor resultado mensal nos critérios informados, com pendências explícitas. Inclui memória temporal da Resolução CGSN 190/2026 para 2027, sem desbloquear indevidamente tabelas monetárias de 2027. Veja `documentacao/VERSAO_05.md`.

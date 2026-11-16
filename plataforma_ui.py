@@ -7,6 +7,7 @@ import os
 import runpy
 import pandas as pd
 import streamlit as st
+from texto_ui import legenda
 import streamlit.components.v1 as components
 from cadastros import listar_empresas,salvar_empresa,importar_lancamentos,conectar
 from importacoes import texto_pdf,extrair_cartao,extrair_qsa,ler_lancamentos,ImportacaoInvalida
@@ -31,6 +32,7 @@ def iniciar(preservar_widgets=False):
         'sc_receita':50000.0,'sc_custos':15000.0,'sc_salarios':8000.0,'sc_prolabore':3000.0,
         'sc_comercio':0.0,'sc_industria':0.0,'sc_servicos':0.0,
         'sc_encargos_fs':0.0,'sc_mes':1,'sc_ano':2026,'sc_anexo':'III','sc_fator':False,
+        'sc_inicio_sn':False,'sc_mes_atividade':2,'sc_historico_inicio':[],'sc_criterio':'Maior líquido para os sócios',
         'sc_rbt12':'','sc_fs12':'','sc_impostos_local':'','sc_patronal':'','sc_patronal_sn':'',
         'sc_cnpj':'','sc_cnae':'','sc_municipio':'','sc_uf':'','sc_data_abertura':'',
         'sc_credito_pis':0.0,'sc_credito_cofins':0.0,'sc_pis_regra':True,
@@ -48,6 +50,10 @@ def iniciar(preservar_widgets=False):
 
 def perfil():
     s=st.session_state
+    from inicio_ui import periodo_do_cenario
+    inicio_pendencia=None
+    try:mes_atividade=periodo_do_cenario()
+    except Pendente as exc:mes_atividade=None;inicio_pendencia=str(exc)
     receitas={'comercio':0,'industria':0,'servicos':0}
     if s.sc_atividade=='Mais de uma atividade':
         receitas={k:s.get('sc_'+k,0) for k in receitas}
@@ -74,7 +80,7 @@ def perfil():
                        origem=s.sc_origem_div,valor=s.sc_dividendo)]
     return dict(empresa=s.sc_empresa,ano=s.sc_ano,mes=s.sc_mes,situacao='abertura' if s.sc_situacao=='Vai começar agora' else 'existente',
         **receitas,custos=s.sc_custos,salarios=s.sc_salarios,prolabore=s.sc_prolabore,encargos_fs=s.sc_encargos_fs,
-        anexo=s.sc_anexo,fator_r=s.sc_fator,rbt12=valor('sc_rbt12'),fs12=valor('sc_fs12'),
+        mes_atividade=mes_atividade,inicio_pendencia=inicio_pendencia,historico_inicio=[x for x in s.sc_historico_inicio if mes_atividade is not None and x['mes_atividade']<mes_atividade],anexo=s.sc_anexo,fator_r=s.sc_fator,rbt12=valor('sc_rbt12'),fs12=valor('sc_fs12'),
         patronal_simples=valor('sc_patronal_sn'),tributos=tributos,distribuicoes=distrib,
         limite_irpj=valor('sc_limite_ir'),limite_csll=valor('sc_limite_cs'),
         fundamento_limite='LC 224/2025, art. 4º §5º; limite nominal por trimestre, sem aproveitamento automático de sobras.',
@@ -101,13 +107,13 @@ def botoes_relatorio(titulo,colunas,linhas,notas=(),chave='relatorio',memoria=No
         st.download_button('Baixar memória com os dados do cenário',json.dumps(memoria,ensure_ascii=False,indent=2,default=str),
             file_name=chave+'.json',mime='application/json',key=chave+'_json')
     with st.expander('Imprimir agora'):
-        st.caption('Use o botão Imprimir relatório dentro do documento. Você também pode baixar o PDF e imprimir pelo navegador.')
+        legenda('Use o botão Imprimir relatório dentro do documento. Você também pode baixar o PDF e imprimir pelo navegador.')
         components.html(html,height=430,scrolling=True)
 
 
 def resumo_dividendos(p,local):
     if p.get('modo_distribuicao')=='automatico':
-        st.caption('Os dividendos são calculados pelo saldo de cada alternativa. Veja o bruto, o IR e o líquido no comparativo do planejamento.')
+        legenda('Os dividendos são calculados pelo saldo de cada alternativa. Veja o bruto, o IR e o líquido no comparativo do planejamento.')
         return {'irrf':None}
     st.markdown('#### IR sobre a distribuição de lucros')
     try:
@@ -115,7 +121,7 @@ def resumo_dividendos(p,local):
         cols=st.columns(3)
         for col,label,campo in zip(cols,['Lucros previstos','IR retido dos sócios','Líquido para os sócios'],['bruto','irrf','liquido']):
             col.metric(label,dinheiro(r[campo]))
-        st.caption('O IR é retido do valor distribuído. Ele entra no total empresa + sócios, sem ser deduzido novamente como despesa da empresa. O ajuste anual dos sócios ainda exige apuração própria.')
+        legenda('O IR é retido do valor distribuído. Ele entra no total empresa + sócios, sem ser deduzido novamente como despesa da empresa. O ajuste anual dos sócios ainda exige apuração própria.')
         return r
     except Pendente as exc:
         st.warning('Dividendos pendentes: '+str(exc));return {'irrf':None}
@@ -124,6 +130,8 @@ def resumo_dividendos(p,local):
 def dados_compartilhados():
     st.title('Vamos planejar sua empresa?')
     st.write('Preencha uma vez. Os dados serão aproveitados nas simulações e nos relatórios.')
+    st.radio('Critério do destaque',['Maior líquido para os sócios','Menor total de tributos'],horizontal=True,key='sc_criterio')
+    resumo_inicial=st.container()
     with st.container(border=True):
         st.radio('Como está sua empresa hoje?',['Vai começar agora','Já está funcionando'],horizontal=True,key='sc_situacao')
         a,b=st.columns(2)
@@ -141,19 +149,21 @@ def dados_compartilhados():
         a,b=st.columns(2)
         a.number_input('Total de salários por mês (R$)',min_value=0.0,step=500.0,key='sc_salarios')
         b.number_input('Pró-labore dos sócios por mês (R$)',min_value=0.0,step=500.0,key='sc_prolabore')
-        st.caption('São previsões editáveis. Para empresa em abertura, o Simples usa a anualização do primeiro mês; não é criado um histórico fictício.')
+        legenda('São previsões editáveis. O início de atividade do Simples respeita a regra vigente no ano; o histórico é informado somente quando necessário.')
+    from inicio_ui import controles_inicio
+    controles_inicio()
     with st.expander('Atividade, impostos e particularidades'):
-        st.caption('Os cartões mostram os impostos já calculados. Se faltar ICMS, ISS, IPI ou outro componente, o subtotal e o saldo ficam identificados como condicionais. Informe zero somente quando esse tributo não for devido.')
+        legenda('Os cartões mostram os impostos já calculados. Se faltar ICMS, ISS, IPI ou outro componente, o subtotal e o saldo ficam identificados como condicionais. Informe zero somente quando esse tributo não for devido.')
         a,b=st.columns(2);a.text_input('CNPJ da empresa',key='sc_cnpj');b.text_input('CNAE / atividade do cadastro',key='sc_cnae')
         a,b=st.columns(2);a.text_input('Município',key='sc_municipio');b.text_input('Estado / UF',key='sc_uf')
         a,b=st.columns(2)
         a.selectbox('Anexo dos serviços, quando não há fator R',['III','IV','V'],key='sc_anexo')
         b.checkbox('Serviços sujeitos ao fator R',key='sc_fator')
         st.number_input('CPP e FGTS integrantes da folha para o fator R (R$)',min_value=0.0,key='sc_encargos_fs')
-        if st.session_state.sc_situacao=='Já está funcionando':
+        if st.session_state.sc_situacao=='Já está funcionando' and not st.session_state.sc_inicio_sn:
             a,b=st.columns(2);a.text_input('Receita dos 12 meses anteriores (RBT12)',key='sc_rbt12');b.text_input('Folha legal dos 12 meses anteriores (FS12)',key='sc_fs12')
         st.checkbox('Projetar PIS/Cofins pela regra geral, sem monofasia, isenção ou receitas especiais',key='sc_pis_regra')
-        st.caption('Hipótese explícita: Presumido cumulativo, PIS 0,65% e Cofins 3% (Lei 9.718/1998); Real não cumulativo, PIS 1,65% e Cofins 7,6% (Leis 10.637/2002 e 10.833/2003). Enquadramentos especiais exigem revisão.')
+        legenda('Hipótese explícita: Presumido cumulativo, PIS 0,65% e Cofins 3% (Lei 9.718/1998); Real não cumulativo, PIS 1,65% e Cofins 7,6% (Leis 10.637/2002 e 10.833/2003). Enquadramentos especiais exigem revisão.')
         a,b=st.columns(2)
         a.number_input('Crédito de PIS previsto no Real (R$)',min_value=0.0,key='sc_credito_pis')
         b.number_input('Crédito de Cofins previsto no Real (R$)',min_value=0.0,key='sc_credito_cofins')
@@ -161,18 +171,18 @@ def dados_compartilhados():
         a.text_input('ICMS, ISS e IPI líquidos por mês · fora do Simples',key='sc_impostos_local',placeholder='Valor confirmado, com ponto para centavos')
         b.text_input('Encargos patronais por mês · fora do Simples',key='sc_patronal',placeholder='Valor confirmado, ou 0 se não houver')
         st.text_input('Encargos fora do DAS para serviços do Anexo IV',key='sc_patronal_sn')
-        st.caption('Encargos em branco: hipótese geral de CPP de 20% sobre salários e pró-labore fora do Simples e no Anexo IV. RAT/FAP, terceiros e regimes especiais exigem complemento; não estão presumidos como zero.')
+        legenda('Encargos em branco: hipótese geral de CPP de 20% sobre salários e pró-labore fora do Simples e no Anexo IV. RAT/FAP, terceiros e regimes especiais exigem complemento; não estão presumidos como zero.')
         st.checkbox('Confirmei a dispensa de recolhimento de CBS/IBS de teste em 2026',key='sc_dispensa_teste_2026')
-        st.caption('A dispensa depende do cumprimento das obrigações acessórias ou de sua desobrigação, conforme LC 214/2025, art. 348, Decreto 12.955/2026, art. 464, e comunicado conjunto RFB/CGIBS. Sem confirmação, o subtotal fora do Simples fica condicional.')
+        legenda('A dispensa depende do cumprimento das obrigações acessórias ou de sua desobrigação, conforme LC 214/2025, art. 348, Decreto 12.955/2026, art. 464, e comunicado conjunto RFB/CGIBS. Sem confirmação, o subtotal fora do Simples fica condicional.')
     with st.expander('Lucros e dividendos dos sócios',expanded=st.session_state.sc_dividendo>0):
-        st.caption('O imposto sobre dividendos entra em todas as comparações. Para PF residente, a regra mensal alcança o total quando a mesma empresa paga mais de R$ 50 mil ao mesmo beneficiário no mês. Não há retenção automática de 10% em qualquer distribuição.')
+        legenda('O imposto sobre dividendos entra em todas as comparações. Para PF residente, a regra mensal alcança o total quando a mesma empresa paga mais de R$ 50 mil ao mesmo beneficiário no mês. Não há retenção automática de 10% em qualquer distribuição.')
         st.radio('Como distribuir o resultado?',['Distribuir todo o saldo','Informar um valor'],key='sc_modo_distribuicao',horizontal=True)
-        st.caption('Por padrão, cada regime distribui o que sobrar após custos, salários, pró-labore bruto e tributos da empresa. O IR é calculado sobre essa distribuição por beneficiário, sem descontar o imposto duas vezes.')
+        legenda('Por padrão, cada regime distribui o que sobrar após custos, salários, pró-labore bruto e tributos da empresa. O IR é calculado sobre essa distribuição por beneficiário, sem descontar o imposto duas vezes.')
         st.checkbox('Usar os sócios do cadastro',key='sc_modo_socios')
         st.selectbox('Origem dos lucros previstos',['2026','2025 ou anteriores'],key='sc_origem_div')
         if st.session_state.sc_modo_socios:
             st.checkbox('Usar a participação societária como rateio dos dividendos',key='sc_rateio_qsa')
-            st.caption('Confirme o tipo de beneficiário e o rateio. Para vários sócios, a soma precisa ser 100%. Pró-labore agregado de vários sócios exige divisão individual para calcular o líquido pessoal.')
+            legenda('Confirme o tipo de beneficiário e o rateio. Para vários sócios, a soma precisa ser 100%. Pró-labore agregado de vários sócios exige divisão individual para calcular o líquido pessoal.')
             cols=['nome','qualificacao','participacao','tipo_beneficiario']
             cols+=['percentual_distribuicao'] if st.session_state.sc_modo_distribuicao=='Distribuir todo o saldo' else ['dividendo_mensal']
             dados=st.session_state.sc_socios or [dict(nome='',qualificacao='',participacao=None,tipo_beneficiario='Não informado',dividendo_mensal='0')]
@@ -187,25 +197,25 @@ def dados_compartilhados():
             if st.session_state.sc_modo_distribuicao=='Informar um valor':
                 st.number_input('Quanto será distribuído por mês? (R$)',min_value=0.0,step=1000.0,key='sc_dividendo')
             st.number_input('Dependentes do sócio para o IRRF do pró-labore',min_value=0,step=1,key='sc_dependentes_socio')
-        st.caption('Hipótese do cenário: beneficiário PF residente no Brasil e lucros de 2026, conforme os campos acima. Confirme ou altere conforme a empresa. IR mínimo anual e redutor dos sócios exigem apuração própria.')
+        legenda('Hipótese do cenário: beneficiário PF residente no Brasil e lucros de 2026, conforme os campos acima. Confirme ou altere conforme a empresa. IR mínimo anual e redutor dos sócios exigem apuração própria.')
     from comparativo_ui import controles_reforma
     controles_reforma()
     with st.expander('Ajustes do contador · quando precisar'):
         a,b=st.columns(2);a.text_input('Prejuízo fiscal anterior · IRPJ',key='sc_saldo_ir');b.text_input('Base negativa anterior · CSLL',key='sc_saldo_cs')
         a,b=st.columns(2);a.text_input('Outros acréscimos trimestrais · IRPJ',key='sc_outros_ir');b.text_input('Outros acréscimos trimestrais · CSLL',key='sc_outros_cs')
         a,b=st.columns(2);a.text_input('Limite disponível de receita · IRPJ',key='sc_limite_ir');b.text_input('Limite disponível de receita · CSLL',key='sc_limite_cs')
-        st.caption('Os limites iniciais são os nominais por trimestre, sem aproveitar sobras. O fechamento anual com majoração da LC 224 ainda está pendente. Adições e exclusões individualizadas permanecem na área técnica.')
+        legenda('Os limites iniciais são os nominais por trimestre, sem aproveitar sobras. O fechamento anual com majoração da LC 224 ainda está pendente. Adições e exclusões individualizadas permanecem na área técnica.')
     if st.session_state.sc_modo_distribuicao=='Distribuir todo o saldo':
         titular='sócios do cadastro, conforme rateio confirmado' if st.session_state.sc_modo_socios else st.session_state.sc_beneficiario+' · '+st.session_state.sc_tipo_div
-        st.caption('Dividendos: todo o saldo de cada regime para '+titular+'. Origem dos lucros: '+st.session_state.sc_origem_div+'. Ajuste em Lucros e dividendos dos sócios, se necessário.')
+        legenda('Dividendos: todo o saldo de cada regime para '+titular+'. Origem dos lucros: '+st.session_state.sc_origem_div+'. Ajuste em Lucros e dividendos dos sócios, se necessário.')
     if st.button('Comparar os três regimes',type='primary',key='comparar_cenario'):
         st.session_state.comparacao_solicitada=True
-    if st.session_state.get('comparacao_solicitada'):mostrar_comparacao()
+    if st.session_state.get('comparacao_solicitada'):mostrar_comparacao(resumo_inicial)
 
 
-def mostrar_comparacao():
+def mostrar_comparacao(resumo_inicial=None):
     from comparativo_ui import exibir_comparacao
-    exibir_comparacao(perfil())
+    exibir_comparacao(perfil(),resumo_inicial)
 
 
 def cadastro_empresa():
@@ -252,7 +262,7 @@ def cadastro_empresa():
             st.session_state._mensagem_cadastro=True
             st.rerun()
         except ImportacaoInvalida as exc:st.error(str(exc))
-    for nota in dados.get('pendencias',[]):st.caption(nota)
+    for nota in dados.get('pendencias',[]):legenda(nota)
 
 
 def contabilidade():
@@ -286,7 +296,7 @@ def contabilidade():
         linhas=[[r['data'],r['debito'],r['credito'],dinheiro(Decimal(r['valor_centavos'])/100 if r['valor_centavos'] is not None else Decimal(str(r['valor']))),r['historico']] for r in registros]
         st.dataframe(pd.DataFrame(linhas,columns=['Data','Débito','Crédito','Valor','Histórico']),hide_index=True,width='stretch')
         botoes_relatorio('Livro de lançamentos',['Data','Débito','Crédito','Valor','Histórico'],linhas,chave='lancamentos')
-    st.caption('Balancete, DRE, balanço patrimonial e lançamentos manuais continuam disponíveis em Ferramentas originais, no mesmo banco de demonstração.')
+    legenda('Balancete, DRE, balanço patrimonial e lançamentos manuais continuam disponíveis em Ferramentas originais, no mesmo banco de demonstração.')
 
 
 def simples():
@@ -294,6 +304,9 @@ def simples():
     st.title('Simples Nacional')
     st.write('Compare os anexos usando o mesmo cenário. A atividade determina o enquadramento permitido; os anexos não são opções livres.')
     p=perfil();receita=sum(p[k] for k in ('comercio','industria','servicos'));linhas=[]
+    if p['ano']==2027:
+        from inicio_ui import exibir_memoria_temporal
+        exibir_memoria_temporal();return
     for anexo in ('I','II','III','IV','V'):
         q=deepcopy(p);q.update(comercio=receita if anexo=='I' else 0,industria=receita if anexo=='II' else 0,
             servicos=receita if anexo not in ('I','II') else 0,anexo=anexo,fator_r=False,atividade_anexo_iv=anexo=='IV')
@@ -308,7 +321,7 @@ def simples():
         'No Anexo IV, CPP fora do DAS incluída pela regra geral de 20% quando não informada; confira RAT/FAP, terceiros e exceções.',
         'Líquido dos sócios inclui pró-labore após INSS/IRRF e dividendos após retenção; depende de escrituração e caixa.',
         'Para serviços sujeitos ao fator R e cenários de reforma, use o Planejamento. Ajuste anual da pessoa física não incluído.']
-    for nota in notas:st.caption(nota)
+    for nota in notas:legenda(nota)
     botoes_relatorio('Simulação dos anexos do Simples',colunas,linhas,notas,chave='simples_com_dividendos')
 
 
@@ -338,7 +351,7 @@ def projecao():
 
 
 def original():
-    st.caption('Ferramentas preservadas do sistema original. As fórmulas legadas continuam em revisão; o novo planejamento apresenta suas pendências separadamente.')
+    legenda('Ferramentas preservadas do sistema original. As fórmulas legadas continuam em revisão; o novo planejamento apresenta suas pendências separadamente.')
     # Compartilha o mesmo banco de demonstração com o cadastro e a importação novos.
     codigo=(BASE/'sistema_original.py').read_text()
     codigo=codigo.replace('DB_NOME = os.path.join(BASE_DIR, "maxsuel_demonstracao.db")','DB_NOME = '+repr(str(DB)))
@@ -436,6 +449,10 @@ def renderizar():
                     referencia=date(abertura.year,abertura.month,1)
                 st.session_state.sc_situacao='Vai começar agora' if (abertura.year,abertura.month)==(referencia.year,referencia.month) else 'Já está funcionando'
             except ValueError:pass
+        if dados.get('data_abertura'):
+            from simples_inicio import idade_meses
+            try:st.session_state.sc_inicio_sn=1<idade_meses(dados['data_abertura'],st.session_state.sc_ano,st.session_state.sc_mes)<=13
+            except Pendente:pass
         if dados.get('qsa'):st.session_state.sc_modo_socios=True
         st.session_state._empresa_carregada=escolhido
     from comparativo_ui import menu_lateral
@@ -463,7 +480,7 @@ def renderizar():
             folha=salario_liquido(salario,int(dependentes),outros_descontos=outros,ano=st.session_state.sc_ano)
             colunas=st.columns(3)
             for coluna,label,chave in zip(colunas,['INSS do funcionário','IRRF do salário','Salário líquido'],['inss','irrf','liquido']):coluna.metric(label,dinheiro(folha[chave]))
-            st.caption(folha['fundamento'])
+            legenda(folha['fundamento'])
             botoes_relatorio('Simulação de salário individual',['Item','Valor'],[
                 ['Salário bruto',dinheiro(salario)],['Dependentes',int(dependentes)],['INSS',dinheiro(folha['inss'])],['IRRF',dinheiro(folha['irrf'])],
                 ['Outros descontos',dinheiro(outros)],['Salário líquido',dinheiro(folha['liquido'])]],

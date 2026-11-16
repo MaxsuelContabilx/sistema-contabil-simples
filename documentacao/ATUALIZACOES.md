@@ -53,3 +53,8 @@ Fechamento completo da LC 224; PIS/Cofins; cadastro por UF/município e operaç�
 ## Versão 0.4 — 16/11/2026
 
 Distribuição automática do saldo por regime, referência atual e projeção explícita de CBS/IBS, PJ × CLT, menu agrupado e tema por sessão. Veja [VERSAO_04.md](VERSAO_04.md) para as hipóteses, fontes, cobertura e pendências. O núcleo de comparação usa subtotais condicionais quando faltam componentes; não transforma ausência em carga global confirmada. `planejador.py` e `pj_clt.py` fazem parte da fotografia dos códigos de cálculo.
+
+
+## Versão 0.5 — 16/11/2026
+
+Presunções e bases expostas nos cartões e relatórios; início do Simples com histórico e média em 2026; memória temporal de 2027 conforme Resolução 190; destaque comparativo com critérios editáveis e classificação provisória quando faltam dados. Ver [VERSAO_05.md](VERSAO_05.md).

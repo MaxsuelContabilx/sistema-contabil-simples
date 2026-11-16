@@ -186,3 +186,26 @@ class Interface(unittest.TestCase):
             app.button(key='nav_Planejamento').click().run()
             self.assertEqual(app.number_input(key='sc_receita').value,280000.0)
         finally:logging.disable(logging.NOTSET)
+
+    def test_media_inicial_presuncao_e_card_provisorio(self):
+        from streamlit.testing.v1 import AppTest
+        logging.disable(logging.CRITICAL)
+        try:
+            app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/'app.py'),default_timeout=30).run()
+            app.radio(key='sc_situacao').set_value('Já está funcionando').run()
+            app.checkbox(key='sc_inicio_sn').check().run()
+            app.number_input(key='sc_mes_atividade').set_value(3).run()
+            app.session_state['historico_inicio_2026_3']={'edited_rows':{0:{'receita':10000.0},1:{'receita':20000.0}},'added_rows':[],'deleted_rows':[]}
+            app.button(key='comparar_cenario').click().run()
+            self.assertEqual(len(app.exception),0)
+            self.assertTrue(any(x.label=='Tributos da empresa' and x.value=='R$ 2.000,00' for x in app.metric))
+            self.assertTrue(any('Melhor resultado provisório' in x.value for x in app.markdown))
+            pres=next(x.value for x in app.dataframe if 'Presunção IRPJ' in x.value.columns)
+            self.assertEqual(pres['Presunção IRPJ'].tolist(),['8,00%'])
+            self.assertTrue(any('RBT12 para a alíquota: R$ 180.000,00' in x.value for x in app.markdown))
+            app.radio(key='sc_criterio').set_value('Menor total de tributos').run()
+            self.assertEqual(len(app.exception),0)
+            app.selectbox(key='sc_ano').set_value(2027).run()
+            self.assertEqual(len(app.exception),0)
+            self.assertTrue(any('RBT12 para a alíquota: R$ 120.000,00' in x.value for x in app.markdown))
+        finally:logging.disable(logging.NOTSET)

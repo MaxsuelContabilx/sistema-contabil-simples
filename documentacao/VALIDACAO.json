@@ -1,7 +1,7 @@
 {
-  "versao": "0.4-revisao-2026",
+  "versao": "0.5-revisao-2026",
   "status": "funcional para testes; apuração tributária ainda parcial",
-  "testes_automatizados": 82,
+  "testes_automatizados": 95,
   "fluxos_navegador": [
     "distribuição automática por regime no exemplo de R$ 280 mil",
     "impostos do Presumido e Real nos cartões com subtotais condicionais",
@@ -12,7 +12,11 @@
     "salário e férias no simulador original",
     "cadastro por cartão CNPJ e QSA",
     "CSV transacional e prevenção de duplicados",
-    "tema por sessão e viewport móvel"
+    "tema por sessão e viewport móvel",
+    "destaque antes do formulário inicial",
+    "critério maior líquido ou menor tributo",
+    "presunção trimestral no quadro e PDF",
+    "cifrões sem interpretação LaTeX no PJ × CLT"
   ],
   "banco": "maxsuel_demonstracao.db; original preservado",
   "documentos_teste": "PDFs gerados com dados fictícios; sem PDF real de CNPJ do usuário nesta sessão",
@@ -23,6 +27,16 @@
     "CBS/IBS de 11,3% e 18,7% são premissas de projeção futura integral, não apuração legal da transição",
     "IR mínimo anual e redutor dos sócios pendentes",
     "anual PJ é projeção financeira de um mês constante, não apuração fiscal anual",
-    "2027, fechamento com majoração e casos especiais continuam pendentes"
+    "2027, fechamento com majoração e casos especiais continuam pendentes",
+    "regra temporal de 2027 disponível, mas DAS e comparação monetária completa de 2027 não desbloqueados"
+  ],
+  "testes_novos": [
+    "média inicial de 2026 com meses zerados",
+    "janelas dos meses 1, 2, 3, 4, 12, 13 e 14",
+    "Resolução 190: primeira faixa e fator R nos primeiros dois meses de 2027",
+    "média de 2027 exclui o mês imediatamente anterior",
+    "meses ausentes e duplicados bloqueados",
+    "empate e classificação provisória",
+    "fluxo com histórico do terceiro mês e memória temporal de 2027"
   ]
 }

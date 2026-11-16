@@ -15,7 +15,7 @@ def serializar(obj):
 def mostrar(resultado, entradas, nome):
     st.warning('Resultado parcial. Não representa carga tributária total ou recomendação de regime.')
     from regras import fotografia_regras
-    dados = {'modulo': nome, 'versao': '0.4-revisao-2026', 'entradas': entradas,
+    dados = {'modulo': nome, 'versao': '0.5-revisao-2026', 'entradas': entradas,
              'fotografia_normativa': resultado.get('regras') or fotografia_regras(2026), 'resultado': resultado}
     if nome in ('simples','presumido','real'):
         from plataforma_ui import iniciar,perfil

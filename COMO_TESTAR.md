@@ -1,4 +1,4 @@
-# Como testar a plataforma Maxsuel — versão 0.4
+# Como testar a plataforma Maxsuel — versão 0.5
 
 Se você já abriu o aplicativo de testes, use o mesmo endereço e atualize com **Ctrl + F5** depois que o Streamlit concluir a atualização. Agora a página inicial é o planejamento com logo e menu lateral, não a prévia estática.
 
@@ -85,3 +85,12 @@ Leia `documentacao/VERSAO_04.md` para o escopo implementado, as fontes e as pend
 - No topo do menu lateral, **Modo escuro** alterna a aparência e preserva o cenário. Relatórios PDF/HTML permanecem claros.
 
 Exemplo para conferência: comércio em abertura em janeiro/2026, receita R$ 280.000, custos e salários zero, pró-labore R$ 8.750, um sócio PF residente. No Simples: DAS R$ 32.765; dividendo bruto R$ 238.485; IR dos dividendos R$ 23.848,50. Não é necessário preencher o dividendo.
+
+## Presunção, primeiros meses e melhor resultado
+
+- O destaque inicial aparece após **Comparar os três regimes**. Escolha maior líquido ou menor total de tributos. Com dados pendentes, o destaque será provisório.
+- No cartão do Presumido, veja os percentuais básicos; abra **Presunção do Lucro Presumido · percentuais e bases** para a memória trimestral.
+- Empresa nos meses seguintes à abertura: escolha **Já está funcionando**, abra **Simples Nacional · primeiros meses e histórico**, marque a condição e informe idade ou data de abertura e o histórico solicitado. Meses sem faturamento recebem zero explícito.
+- Para 2027, o quadro mostra o critério temporal da Resolução 190/2026, sem repetir tabelas monetárias de 2026. O DAS e a comparação completa de 2027 permanecem pendentes de revisão.
+
+Detalhes em `documentacao/VERSAO_05.md`.

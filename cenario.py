@@ -22,24 +22,8 @@ def ir_dividendos_cenario(distribuicoes,*,ano=2026,mes=1,fonte='Empresa do cená
 
 
 def simples_primeiro_mes(receitas,fs_legal,*,anexo='III',sujeito_fator=False,ano=2026):
-    """Res. CGSN 140/2018, art. 21 §2º e art. 26 §6º; apenas receitas ordinárias."""
-    if ano!=2026:raise Pendente('Regras do ano selecionado ainda pendentes de revisão.')
-    total=sum((numero(v) for v in receitas.values()),ZERO);fs=numero(fs_legal)
-    if total>D('300000'):raise Pendente('Início de atividade acima do sublimite proporcional: revisar ICMS/ISS e efeitos do excesso.')
-    if total==0:
-        return dict(das=ZERO,anexo_servicos=anexo,fator_r=None,rbt12_proporcional=ZERO,
-            fundamento='Res. CGSN 140/2018, arts. 21 §2º e 26 §6º; sem receita no primeiro mês.')
-    fator=fs/total if fs>0 else D('.01')
-    if sujeito_fator:anexo='III' if fator>=D('.28') else 'V'
-    detalhes=[];das=ZERO
-    for atividade,tabela in [('comercio','I'),('industria','II'),('servicos',anexo)]:
-        valor=numero(receitas.get(atividade,'0'))
-        if not valor:continue
-        faixa=faixa_simples(total*12,tabela,ano)
-        imposto=moeda(valor*faixa['efetiva']);das+=imposto
-        detalhes.append(dict(atividade=atividade,anexo=tabela,receita=valor,**faixa,das=imposto))
-    return dict(das=das,detalhes=detalhes,anexo_servicos=anexo,fator_r=fator,
-        rbt12_proporcional=total*12,fundamento='Res. CGSN 140/2018, art. 21 §2º e art. 26 §6º. Previsões do primeiro mês, não histórico fictício.')
+    from simples_inicio import calcular_inicio
+    return calcular_inicio(receitas,fs_legal,anexo=anexo,sujeito_fator=sujeito_fator,ano=ano)
 
 
 def comparar(cenario):
@@ -64,9 +48,12 @@ def comparar(cenario):
                   componentes={},pendencias=[],memoria={},resultado_gerencial=None)
         try:
             if regime=='Simples Nacional':
-                if cenario.get('situacao')=='abertura':
-                    resultado=simples_primeiro_mes(receitas,numero(cenario.get('encargos_fs'))+salarios+prolabore,
-                        anexo=cenario.get('anexo','III'),sujeito_fator=cenario.get('fator_r',False),ano=ano)
+                if cenario.get('inicio_pendencia'):raise Pendente(cenario['inicio_pendencia'])
+                if cenario.get('situacao')=='abertura' or cenario.get('mes_atividade') is not None:
+                    from simples_inicio import calcular_inicio
+                    resultado=calcular_inicio(receitas,numero(cenario.get('encargos_fs'))+salarios+prolabore,
+                        anexo=cenario.get('anexo','III'),sujeito_fator=cenario.get('fator_r',False),ano=ano,
+                        mes_atividade=cenario.get('mes_atividade') or 1,historico=cenario.get('historico_inicio'))
                 else:
                     fs12=numero(cenario.get('fs12')) if cenario.get('fator_r') else ZERO
                     resultado=simples_mensal(cenario.get('rbt12'),fs12,[dict(valor=v,
