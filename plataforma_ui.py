@@ -96,10 +96,14 @@ def perfil():
         dispensa_teste_2026_confirmada=s.sc_dispensa_teste_2026)
 
 
-def botoes_relatorio(titulo,colunas,linhas,notas=(),chave='relatorio',memoria=None):
+def botoes_relatorio(titulo,colunas,linhas,notas=(),chave='relatorio',memoria=None,painel=None):
     kwargs=dict(empresa=st.session_state.sc_empresa,observacoes=notas,logo=LOGO)
-    pdf=pdf_relatorio(titulo,colunas,linhas,**kwargs)
-    html=html_relatorio(titulo,colunas,linhas,**kwargs)
+    if painel:
+        from relatorio_executivo import gerar_pdf,gerar_html
+        pdf=gerar_pdf(titulo,painel,logo=LOGO);html=gerar_html(titulo,painel,logo=LOGO)
+    else:
+        pdf=pdf_relatorio(titulo,colunas,linhas,**kwargs)
+        html=html_relatorio(titulo,colunas,linhas,**kwargs)
     c1,c2=st.columns(2)
     c1.download_button('Baixar relatório em PDF',pdf,file_name=chave+'.pdf',mime='application/pdf',key=chave+'_pdf')
     c2.download_button('Baixar versão para impressão',html,file_name=chave+'.html',mime='text/html',key=chave+'_html')
@@ -150,6 +154,12 @@ def dados_compartilhados():
         a.number_input('Total de salários por mês (R$)',min_value=0.0,step=500.0,key='sc_salarios')
         b.number_input('Pró-labore dos sócios por mês (R$)',min_value=0.0,step=500.0,key='sc_prolabore')
         legenda('São previsões editáveis. O início de atividade do Simples respeita a regra vigente no ano; o histórico é informado somente quando necessário.')
+    from enquadramento import avaliar_simples
+    try:aviso=avaliar_simples(perfil())
+    except Pendente:aviso=None
+    if aviso:
+        st.warning(aviso['titulo'])
+        legenda(aviso['motivo']+' Receita anual projetada: '+dinheiro(aviso['receita_anual_projetada']))
     from inicio_ui import controles_inicio
     controles_inicio()
     with st.expander('Atividade, impostos e particularidades'):
@@ -304,6 +314,10 @@ def simples():
     st.title('Simples Nacional')
     st.write('Compare os anexos usando o mesmo cenário. A atividade determina o enquadramento permitido; os anexos não são opções livres.')
     p=perfil();receita=sum(p[k] for k in ('comercio','industria','servicos'));linhas=[]
+    from enquadramento import avaliar_simples
+    aviso=avaliar_simples(p)
+    if aviso:
+        st.warning(aviso['titulo']);st.write(aviso['motivo']);legenda(aviso['nota']);return
     if p['ano']==2027:
         from inicio_ui import exibir_memoria_temporal
         exibir_memoria_temporal();return

@@ -82,6 +82,14 @@ def exibir_resultado(p,modelo,*,chave,mostrar_destaque=True):
         cond=item.get('calculo_condicional',False)
         with coluna,st.container(border=True):
             st.markdown('#### '+item['regime'])
+            enquadramento=item.get('enquadramento')
+            if enquadramento:
+                st.warning(enquadramento['titulo'])
+                st.write(enquadramento['motivo'])
+                legenda('Receita anual projetada: '+dinheiro(enquadramento['receita_anual_projetada']))
+                legenda(enquadramento['nota'])
+                linhas.append([item['regime'],enquadramento['titulo'],'Não apurado','Não apurado','Não apurado','Não apurado'])
+                continue
             if cond:legenda('CENÁRIO CONDICIONAL · veja os componentes não incluídos abaixo')
             st.metric('Líquido dos sócios',dinheiro(item.get('liquido_total_socios')))
             st.metric('Tributos da empresa'+(' · subtotal' if cond else ''),dinheiro(item['tributos_empresa']))
@@ -134,7 +142,8 @@ def exibir_resultado(p,modelo,*,chave,mostrar_destaque=True):
     if modelo=='reforma':notas += [f"Premissas: CBS {p['cbs_pct']}%, IBS {p['ibs_pct']}%, redução {p['reducao_iva_pct']}%; preço {p['preco_reforma']}; créditos CBS {p['credito_cbs']} e IBS {p['credito_ibs']}; Simples {p['simples_reforma']}."]
     botoes_relatorio('Planejamento tributário · '+('atual' if modelo=='atual' else 'projeção da reforma'),
         ['Regime','Tributos empresa','Dividendo bruto','IR dividendos','Empresa + sócios','Líquido sócios'],linhas,notas,
-        chave=chave,memoria=dict(r,destaque=destaque,regras=fotografia_regras(p['ano'])))
+        chave=chave,memoria=dict(r,destaque=destaque,regras=fotografia_regras(p['ano'])),
+        painel={'resultado':r,'destaque':destaque,'cenario':p})
 
 
 def exibir_comparacao(p,resumo_inicial=None):

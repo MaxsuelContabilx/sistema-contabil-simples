@@ -1,4 +1,4 @@
-# Como testar a plataforma Maxsuel — versão 0.5
+# Como testar a plataforma Maxsuel — versão 0.6
 
 Se você já abriu o aplicativo de testes, use o mesmo endereço e atualize com **Ctrl + F5** depois que o Streamlit concluir a atualização. Agora a página inicial é o planejamento com logo e menu lateral, não a prévia estática.
 
@@ -94,3 +94,5 @@ Exemplo para conferência: comércio em abertura em janeiro/2026, receita R$ 280
 - Para 2027, o quadro mostra o critério temporal da Resolução 190/2026, sem repetir tabelas monetárias de 2026. O DAS e a comparação completa de 2027 permanecem pendentes de revisão.
 
 Detalhes em `documentacao/VERSAO_05.md`.
+
+Relatório comparativo: resumo executivo com melhor resultado e memória técnica separada. Avisos do Simples distinguem não enquadramento no cenário e sublimite de ICMS/ISS. Veja `documentacao/VERSAO_06.md`.

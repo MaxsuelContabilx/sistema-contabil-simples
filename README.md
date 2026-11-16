@@ -1,4 +1,4 @@
-# Maxsuel — Planejamento tributário, versão 0.5 de revisão
+# Maxsuel — Planejamento tributário, versão 0.6 de revisão
 
 **Versão de testes com cenários financeiros condicionais; não homologada para apuração fiscal definitiva.**
 
@@ -35,4 +35,6 @@ Leia `documentacao/REVISAO_TECNICA.md` para regras implementadas, pendências, l
 
 O menu comparativo abre os componentes em revisão. Não indica um vencedor enquanto a carga global e a elegibilidade não estiverem completas. As exportações JSON/HTML incluem as entradas do cálculo, fundamento e pendências. O módulo de folha permanece legado e não foi validado nesta etapa.
 
-A versão 0.5 mostra percentuais e bases de presunção, permite o histórico dos primeiros meses do Simples e destaca o melhor resultado mensal nos critérios informados, com pendências explícitas. Inclui memória temporal da Resolução CGSN 190/2026 para 2027, sem desbloquear indevidamente tabelas monetárias de 2027. Veja `documentacao/VERSAO_05.md`.
+A versão 0.6 mostra percentuais e bases de presunção, permite o histórico dos primeiros meses do Simples e destaca o melhor resultado mensal nos critérios informados, com pendências explícitas. Inclui memória temporal da Resolução CGSN 190/2026 para 2027, sem desbloquear indevidamente tabelas monetárias de 2027. Veja `documentacao/VERSAO_05.md`.
+
+Relatório comparativo: resumo executivo com melhor resultado e memória técnica separada. Avisos do Simples distinguem não enquadramento no cenário e sublimite de ICMS/ISS. Veja `documentacao/VERSAO_06.md`.

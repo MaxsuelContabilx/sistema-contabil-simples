@@ -2,10 +2,25 @@
   "formato": 1,
   "versoes": [
     {
-      "id": "2026-revisao-0.5",
+      "id": "2026-revisao-0.6",
       "inicio": "2026-01-01",
       "fim": "2026-12-31",
       "estado": "revisao",
+      "revisao_em": "2026-11-16",
+      "descricao": "Relatório executivo com destaque comparativo e avisos de limite/sublimite no cenário.",
+      "atualizacoes_pendentes": [
+        "Fechamento anual da LC 224 com majoração e ajustes",
+        "Tributos de consumo e folha",
+        "Tratamentos especiais do Simples",
+        "Tributação mínima anual dos sócios",
+        "Tabelas, partilhas e transição de 2027"
+      ]
+    },
+    {
+      "id": "2026-revisao-0.5",
+      "inicio": "2026-01-01",
+      "fim": "2026-12-31",
+      "estado": "arquivada",
       "revisao_em": "2026-11-16",
       "descricao": "Presunção transparente, média de início do Simples em 2026, memória temporal da Resolução 190 e destaque comparativo com pendências.",
       "atualizacoes_pendentes": [

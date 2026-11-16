@@ -113,6 +113,11 @@ def planejar(cenario,modelo='atual'):
     if int(cenario.get('ano',2026))!=2026:raise Pendente('As tabelas de renda e folha disponíveis são de 2026. A reforma é uma projeção separada, sem tratar essas referências como apuração legal de 2027.')
     motor,iva,pend,hipoteses=_preparar(cenario,modelo)
     r=_comparar_com_cpp(motor,cenario)
+    from enquadramento import avaliar_simples
+    enquadramento=avaliar_simples(cenario)
+    if enquadramento:
+        sn=r['resultados'][0];sn['enquadramento']=enquadramento
+        sn['pendencias']=[enquadramento['motivo'],enquadramento['nota']]+sn['pendencias']
     try:
         if len(cenario.get('distribuicoes') or [])>1 and numero(cenario['prolabore'])>0:
             raise Pendente('Para calcular o pró-labore líquido de vários sócios, informe a remuneração individual; o teto não foi aplicado ao valor agregado.')

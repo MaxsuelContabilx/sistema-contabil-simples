@@ -1,7 +1,7 @@
 {
-  "versao": "0.5-revisao-2026",
+  "versao": "0.6-revisao-2026",
   "status": "funcional para testes; apuração tributária ainda parcial",
-  "testes_automatizados": 95,
+  "testes_automatizados": 99,
   "fluxos_navegador": [
     "distribuição automática por regime no exemplo de R$ 280 mil",
     "impostos do Presumido e Real nos cartões com subtotais condicionais",
@@ -16,7 +16,10 @@
     "destaque antes do formulário inicial",
     "critério maior líquido ou menor tributo",
     "presunção trimestral no quadro e PDF",
-    "cifrões sem interpretação LaTeX no PJ × CLT"
+    "cifrões sem interpretação LaTeX no PJ × CLT",
+    "relatório executivo com destaque no PDF e HTML",
+    "acionamento de impressão no novo HTML",
+    "avisos para R$ 8 milhões mensais e R$ 350 mil mensais"
   ],
   "banco": "maxsuel_demonstracao.db; original preservado",
   "documentos_teste": "PDFs gerados com dados fictícios; sem PDF real de CNPJ do usuário nesta sessão",
