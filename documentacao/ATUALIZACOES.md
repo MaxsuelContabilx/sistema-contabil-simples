@@ -1,5 +1,11 @@
 # Atualizações periódicas e projeções anuais
 
+## Prévia de navegação no aplicativo de testes
+
+Após o retorno sobre a usabilidade, `testar_planejamento.py` passou a abrir uma prévia do novo visual. A proposta mantém o logo, utiliza uma entrada compartilhada de previsões e mostra os caminhos de empresa em abertura e empresa em funcionamento. A prévia demonstra navegação; os cálculos tributários não foram integrados a ela.
+
+O topo oferece também acesso ao sistema original, incluindo o Simples, o fator R, salários individuais e férias. `sistema_original.py` preserva o código enviado, com apenas a configuração de página delegada à entrada e o banco alterado para `maxsuel_demonstracao.db`. Essa recuperação de recursos não valida as fórmulas antigas. A versão técnica continua acessível em Cálculos em revisão.
+
 ## Versão 0.2 — 15/11/2026
 
 Nova aba **Projeção de 1 ano** no planejamento tributário:

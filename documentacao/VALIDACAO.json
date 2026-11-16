@@ -2,14 +2,15 @@
   "versao": "0.2-revisao-2026",
   "status": "parcial; não homologada; branch de testes",
   "testes_motor_e_projecoes": 33,
-  "testes_interface": 3,
-  "total_testes": 36,
+  "testes_interface": 4,
+  "total_testes": 37,
   "entrada_isolada": "testar_planejamento.py",
   "novidades": [
     "projeção anual de 12 meses",
     "memórias normativas versionadas",
     "consulta de relatórios anteriores",
-    "entrada de testes sem SQLite"
+    "entrada de testes sem SQLite",
+    "prévia de navegação e acesso ao sistema original com banco de demonstração"
   ],
   "limitacoes": [
     "carga global pendente",

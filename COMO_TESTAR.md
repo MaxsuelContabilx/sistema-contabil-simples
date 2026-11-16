@@ -2,6 +2,17 @@
 
 Esta é uma versão parcial para avaliação, com projeções anuais e regras tributárias em revisão. Não atualiza o sistema em produção nem homologa apurações fiscais.
 
+## O que abre agora
+
+A entrada `testar_planejamento.py` abre inicialmente a **Prévia do novo visual**, no mesmo aplicativo de testes. Use os menus da prévia para experimentar o preenchimento único e o fluxo de empresa em abertura. Os valores tributários não são calculados nessa prévia.
+
+No topo da página há outras duas opções:
+
+- **Sistema original:** recupera seu logo, a navegação e os simuladores originais de Simples, fator R, salários individuais, férias e contabilidade. Usa o banco separado `maxsuel_demonstracao.db`; as fórmulas antigas continuam identificadas como pendentes de revisão.
+- **Cálculos em revisão:** abre a versão técnica disponibilizada anteriormente, com as limitações já documentadas.
+
+Se você estava com o aplicativo aberto antes dessa atualização, recarregue a página depois que o Streamlit terminar de atualizar. O novo topo mostra as três opções acima.
+
 ## Baixar
 
 1. Abra a branch `revisao-planejamento-tributario-v02` no GitHub.
@@ -28,7 +39,7 @@ python3 -m venv .venv
 .venv/bin/python -m streamlit run testar_planejamento.py
 ```
 
-O navegador deve abrir o endereço local informado pelo Streamlit, normalmente `http://localhost:8501`. Essa entrada de testes não abre o SQLite nem o histórico contábil do repositório.
+O navegador deve abrir o endereço local informado pelo Streamlit, normalmente `http://localhost:8501`. A prévia e os cálculos em revisão não abrem o SQLite contábil. A opção Sistema original usa exclusivamente o banco de demonstração separado.
 
 ## Alternativa: outro aplicativo no Streamlit Community Cloud
 

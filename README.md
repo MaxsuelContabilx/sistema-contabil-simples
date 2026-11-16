@@ -15,7 +15,7 @@ python -m pip install -r requirements.txt
 streamlit run testar_planejamento.py
 ```
 
-`testar_planejamento.py` abre somente as simulações e não acessa o banco contábil ou o CSV. Os arquivos que já existem no repositório são preservados pela branch. Use uma pasta separada para testar. `app.py` contém a integração com o sistema completo e acessa o SQLite existente; não é necessário executá-lo para experimentar as novas telas.
+`testar_planejamento.py` abre inicialmente a prévia interativa do novo visual. No topo, escolha **Sistema original** para acessar os simuladores e módulos antigos, ou **Cálculos em revisão** para conferir a versão técnica. A prévia não apura tributos. O sistema original nessa entrada usa o banco separado `maxsuel_demonstracao.db`; as fórmulas antigas ainda precisam de revisão. Os arquivos que já existem no repositório são preservados pela branch. Use uma pasta separada para testar. `app.py` contém a integração técnica anterior com o sistema completo e acessa o SQLite existente.
 
 Veja `COMO_TESTAR.md` para o passo a passo no computador ou em um aplicativo separado no Streamlit Community Cloud.
 

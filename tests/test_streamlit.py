@@ -7,6 +7,26 @@ import unittest
 
 @unittest.skipUnless(importlib.util.find_spec('streamlit'), 'Streamlit não instalado')
 class Interface(unittest.TestCase):
+    def test_acesso_ao_original_preserva_simulador_de_salario(self):
+        from streamlit.testing.v1 import AppTest
+        logging.disable(logging.CRITICAL)
+        try:
+            base=Path(__file__).resolve().parents[1]
+            banco=base/'maxsuel_contabilidade.db'
+            antes=banco.read_bytes() if banco.exists() else None
+            app=AppTest.from_file(str(base/'testar_planejamento.py'),default_timeout=30).run()
+            app.radio(key='modo_apresentacao').set_value('Sistema original').run()
+            self.assertEqual(len(app.exception),0)
+            app.radio(key='nav_radio').set_value('📋 Módulo de Folha & Fator R').run()
+            operacao=next(x for x in app.radio if x.label=='Escolha a Operação:')
+            operacao.set_value('🧮 Simulador Prático de Salário Líquido (2026)').run()
+            self.assertEqual(len(app.exception),0)
+            self.assertTrue(any('Demonstrativo de Pagamento Mensal Emitido' in x.value for x in app.subheader))
+            self.assertTrue(any('Salário Bruto / Pró-Labore' in x.label for x in app.number_input))
+            self.assertEqual(banco.read_bytes() if banco.exists() else None,antes)
+        finally:
+            logging.disable(logging.NOTSET)
+
     def test_entrada_isolada_nao_abre_banco_contabil(self):
         from streamlit.testing.v1 import AppTest
         from unittest.mock import patch
@@ -16,7 +36,8 @@ class Interface(unittest.TestCase):
                 app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/'testar_planejamento.py'),default_timeout=30).run()
                 self.assertEqual(len(app.exception),0)
                 conectar.assert_not_called()
-                self.assertTrue(any('Planejamento tributário' in x.value for x in app.title))
+                self.assertEqual(app.radio(key='modo_apresentacao').value, 'Prévia do novo visual')
+                self.assertTrue(any('PRÉVIA DE NAVEGAÇÃO' in x.value for x in app.caption))
         finally:
             logging.disable(logging.NOTSET)
 
