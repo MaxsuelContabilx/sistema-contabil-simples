@@ -88,7 +88,10 @@ def renderizar_projecoes():
             saldos_csll=saldo_cs, ajustes=ajustes.to_dict('records'), confirmado=confirmado)
         from plataforma_ui import iniciar,perfil
         iniciar()
-        entradas['distribuicoes']=perfil()['distribuicoes']
+        p=perfil()
+        entradas['distribuicoes']=p['distribuicoes'] if p.get('modo_distribuicao')=='manual' else None
+        if p.get('modo_distribuicao')=='automatico':
+            st.caption('Nesta apuração técnica de componentes, o saldo distribuível completo não foi informado. IR dos dividendos permanece pendente; não foi presumido zero. O comparativo financeiro com distribuição automática está em Planejamento.')
         try:
             resultado = projetar_ano(**entradas)
         except (Pendente, ValueError, TypeError, KeyError) as exc:

@@ -15,7 +15,7 @@ def serializar(obj):
 def mostrar(resultado, entradas, nome):
     st.warning('Resultado parcial. Não representa carga tributária total ou recomendação de regime.')
     from regras import fotografia_regras
-    dados = {'modulo': nome, 'versao': '0.3-revisao-2026', 'entradas': entradas,
+    dados = {'modulo': nome, 'versao': '0.4-revisao-2026', 'entradas': entradas,
              'fotografia_normativa': resultado.get('regras') or fotografia_regras(2026), 'resultado': resultado}
     if nome in ('simples','presumido','real'):
         from plataforma_ui import iniciar,perfil
@@ -23,6 +23,7 @@ def mostrar(resultado, entradas, nome):
         from tax_engine import Pendente
         iniciar();p=perfil()
         try:
+            if p.get('modo_distribuicao')=='automatico':raise Pendente('O módulo técnico calcula componentes isolados, sem todas as receitas, despesas e tributos do período para obter o saldo. Os dividendos automáticos por regime estão no Planejamento; não foi informado IR igual a zero aqui.')
             meses=[entradas.get('mes',p['mes'])] if nome=='simples' else list(range((entradas.get('trimestre',1)-1)*3+1,entradas.get('trimestre',1)*3+1))
             divs=[ir_dividendos_cenario(p['distribuicoes'],ano=2026,mes=m,fonte=p['empresa']) for m in meses]
             ir=sum((x['irrf'] for x in divs),0)

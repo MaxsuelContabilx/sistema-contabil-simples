@@ -2,10 +2,25 @@
   "formato": 1,
   "versoes": [
     {
-      "id": "2026-revisao-0.3",
+      "id": "2026-revisao-0.4",
       "inicio": "2026-01-01",
       "fim": "2026-12-31",
       "estado": "revisao",
+      "revisao_em": "2026-11-16",
+      "descricao": "Distribuição automática por regime, cenários de reforma, PJ × CLT, menu organizado e tema por sessão.",
+      "atualizacoes_pendentes": [
+        "Fechamento anual da LC 224 com majoração e ajustes",
+        "Tributos de consumo e folha",
+        "Tratamentos especiais do Simples",
+        "Tributação mínima anual dos sócios",
+        "Tabelas, partilhas e transição de 2027"
+      ]
+    },
+    {
+      "id": "2026-revisao-0.3",
+      "inicio": "2026-01-01",
+      "fim": "2026-12-31",
+      "estado": "arquivada",
       "revisao_em": "2026-11-15",
       "descricao": "Interface operacional, cadastro CNPJ/QSA, importações validadas e IRRF de dividendos nos cenários.",
       "atualizacoes_pendentes": [

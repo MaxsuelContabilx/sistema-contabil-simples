@@ -1,6 +1,6 @@
-# Maxsuel — Planejamento tributário, versão 0.3 de revisão
+# Maxsuel — Planejamento tributário, versão 0.4 de revisão
 
-**Cópia de desenvolvimento local, ainda sem comparação global validada.**
+**Versão de testes com cenários financeiros condicionais; não homologada para apuração fiscal definitiva.**
 
 Integra ao Streamlit um núcleo separado de cálculos para o recorte de 2026. A interface mostra limitações e bloqueia casos não contemplados. Esta versão é preparada para uma branch de testes; a publicação dessa branch não altera a `main` nem configura a hospedagem em produção.
 
@@ -21,7 +21,7 @@ O banco padrão continua separado: `maxsuel_demonstracao.db`. O SQLite original 
 
 O cadastro lê PDFs com texto do cartão CNPJ e, opcionalmente, um QSA separado. Exige conferência antes de salvar e não presume participação societária ou residência fiscal. PDFs de imagem precisam de OCR, ainda não implementado. Os documentos enviados não são publicados no GitHub.
 
-CSV contábil: datas e contas validadas, valores brasileiros, importação transacional e prevenção de duplicidade. Relatórios: PDF paginado e HTML com impressão no próprio documento. O IRRF dos dividendos é apresentado nos cenários, anexos, projeções e subtotais consolidados; a apuração mínima anual dos sócios ainda está pendente.
+CSV contábil: datas e contas validadas, valores brasileiros, importação transacional e prevenção de duplicidade. Relatórios: PDF paginado e HTML com impressão no próprio documento. O planejamento distribui automaticamente o saldo de cada regime e calcula o IRRF por beneficiário. Inclui referência atual, projeção futura com CBS/IBS informados, menu organizado, tema claro/escuro e PJ × CLT. Projeções e apurações técnicas de componentes isolados não presumem saldo distribuível: sem o saldo completo, o IRRF permanece pendente. A apuração mínima anual dos sócios ainda está pendente. Veja `documentacao/VERSAO_04.md`.
 
 Veja `COMO_TESTAR.md` para o passo a passo no computador ou em um aplicativo separado no Streamlit Community Cloud.
 

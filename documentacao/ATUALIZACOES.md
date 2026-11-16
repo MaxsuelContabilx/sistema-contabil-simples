@@ -48,3 +48,8 @@ Não foi criado um agendamento automático. A estrutura permite revisões perió
 ## Próximos itens da evolução
 
 Fechamento completo da LC 224; PIS/Cofins; cadastro por UF/município e operação para ICMS/ISS; partilha do DAS; monofasia/ST; Parte B; folha; tributação anual dos sócios; transição e tabelas de 2027; integração de DRE, precificação e indicadores do HTML ao motor comum.
+
+
+## Versão 0.4 — 16/11/2026
+
+Distribuição automática do saldo por regime, referência atual e projeção explícita de CBS/IBS, PJ × CLT, menu agrupado e tema por sessão. Veja [VERSAO_04.md](VERSAO_04.md) para as hipóteses, fontes, cobertura e pendências. O núcleo de comparação usa subtotais condicionais quando faltam componentes; não transforma ausência em carga global confirmada. `planejador.py` e `pj_clt.py` fazem parte da fotografia dos códigos de cálculo.

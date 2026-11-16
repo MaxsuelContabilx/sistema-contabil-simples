@@ -1,4 +1,4 @@
-# Como testar a plataforma Maxsuel — versão 0.3
+# Como testar a plataforma Maxsuel — versão 0.4
 
 Se você já abriu o aplicativo de testes, use o mesmo endereço e atualize com **Ctrl + F5** depois que o Streamlit concluir a atualização. Agora a página inicial é o planejamento com logo e menu lateral, não a prévia estática.
 
@@ -7,9 +7,9 @@ Se você já abriu o aplicativo de testes, use o mesmo endereço e atualize com 
 1. Selecione uma empresa cadastrada ou dê um nome ao cenário.
 2. Escolha **Vai começar agora** ou **Já está funcionando**.
 3. Informe atividade, faturamento, custos, salários e pró-labore uma vez.
-4. Em **Lucros e dividendos dos sócios**, informe o beneficiário e quanto prevê distribuir. O QSA cadastrado pode ser reaproveitado, sem presumir participações ou residência fiscal.
-5. Clique em **Comparar os três regimes**. A comparação distingue tributos da empresa, IR dos dividendos e total consolidado.
-6. Se um imposto estiver pendente, abra **Atividade, impostos e particularidades**. Informe zero somente quando realmente não houver aquele tributo.
+4. O modo padrão distribui **todo o saldo** de cada regime. Não é necessário informar um valor de dividendo. Em **Lucros e dividendos dos sócios**, confirme o beneficiário e a residência fiscal. Se houver vários sócios, confirme um rateio que some 100%. O valor manual continua opcional.
+5. Clique em **Comparar os três regimes**. A primeira aba mostra a referência atual de 2026; a segunda, a projeção de CBS/IBS. Os cartões mostram líquido dos sócios, tributos, dividendos e IR. O total consolidado inclui também INSS/IRRF do pró-labore.
+6. Subtotais com ICMS/ISS/IPI, encargos ou dispensa dos tributos de teste de 2026 a confirmar ficam identificados como **condicionais**. Abra **Atividade, impostos e particularidades** para complementar. Informe zero somente quando o tributo não for devido.
 
 As previsões são mantidas ao navegar pelo Simples, salários, relatórios e projeções. São hipóteses de planejamento, não apuração fiscal definitiva. O fator R e as regras de abertura não usam um histórico fictício.
 
@@ -44,7 +44,7 @@ Em **Equipe e salários**, informe o salário individual e os dependentes para a
 
 ## Projeções
 
-**Projeção de 1 ano** aproveita o cenário e gera 12 meses financeiros, com a retenção projetada dos dividendos apresentada separadamente. A projeção tributária detalhada por trimestre continua em **Ferramentas técnicas**. Regras ainda não revisadas, incluindo 2027, ficam pendentes.
+**Projeção de 1 ano** aproveita o cenário e gera 12 meses financeiros, com dividendos manuais apresentados separadamente quando informados. No modo automático, o saldo distribuível depende da apuração completa e fica pendente nessa grade. A projeção tributária detalhada por trimestre continua em **Ferramentas técnicas**. Regras ainda não revisadas, incluindo 2027, ficam pendentes.
 
 ## Executar no computador
 
@@ -76,4 +76,12 @@ Testes:
 python -m unittest discover -s tests -v
 ```
 
-Leia `documentacao/VERSAO_03.md` para o escopo implementado, as fontes e as pendências.
+Leia `documentacao/VERSAO_04.md` para o escopo implementado, as fontes e as pendências.
+
+## Reforma e PJ × CLT
+
+- Em **Reforma tributária · comparar cenários**, ajuste CBS (11,3%), IBS (18,7%), preço e créditos. São premissas de projeção futura integral, não alíquotas legais definitivas ou apuração da transição. O DAS futuro é uma referência de 2026, identificada como condicional.
+- No menu **PJ × CLT**, informe as duas propostas, dependentes, benefícios e meses faturados. O lado PJ reaproveita os custos e o pró-labore do planejamento. FGTS e benefícios ficam separados do líquido anual CLT.
+- No topo do menu lateral, **Modo escuro** alterna a aparência e preserva o cenário. Relatórios PDF/HTML permanecem claros.
+
+Exemplo para conferência: comércio em abertura em janeiro/2026, receita R$ 280.000, custos e salários zero, pró-labore R$ 8.750, um sócio PF residente. No Simples: DAS R$ 32.765; dividendo bruto R$ 238.485; IR dos dividendos R$ 23.848,50. Não é necessário preencher o dividendo.

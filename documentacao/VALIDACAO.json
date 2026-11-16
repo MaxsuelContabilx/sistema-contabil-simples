@@ -1,15 +1,18 @@
 {
-  "versao": "0.3-revisao-2026",
+  "versao": "0.4-revisao-2026",
   "status": "funcional para testes; apuração tributária ainda parcial",
-  "testes_automatizados": 62,
+  "testes_automatizados": 82,
   "fluxos_navegador": [
-    "cenário compartilhado",
-    "IR dos dividendos nos três regimes",
-    "download de PDF",
-    "acionamento do botão de impressão",
+    "distribuição automática por regime no exemplo de R$ 280 mil",
+    "impostos do Presumido e Real nos cartões com subtotais condicionais",
+    "projeção CBS 11,3% e IBS 18,7%",
+    "PJ × CLT, INSS progressivo e meses sem nota",
+    "PDF e acionamento de impressão atual, reforma e PJ × CLT",
+    "navegação com cenário preservado",
+    "salário e férias no simulador original",
     "cadastro por cartão CNPJ e QSA",
-    "importação CSV",
-    "prevenção de duplicados"
+    "CSV transacional e prevenção de duplicados",
+    "tema por sessão e viewport móvel"
   ],
   "banco": "maxsuel_demonstracao.db; original preservado",
   "documentos_teste": "PDFs gerados com dados fictícios; sem PDF real de CNPJ do usuário nesta sessão",
@@ -17,6 +20,9 @@
     "não testa impressora física",
     "não recolhe ou transmite tributos",
     "OCR não implementado",
-    "2027 e casos especiais continuam pendentes"
+    "CBS/IBS de 11,3% e 18,7% são premissas de projeção futura integral, não apuração legal da transição",
+    "IR mínimo anual e redutor dos sócios pendentes",
+    "anual PJ é projeção financeira de um mês constante, não apuração fiscal anual",
+    "2027, fechamento com majoração e casos especiais continuam pendentes"
   ]
 }
