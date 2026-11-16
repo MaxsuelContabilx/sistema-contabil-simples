@@ -1,4 +1,4 @@
-# Maxsuel — Planejamento tributário, versão 0.2 de revisão
+# Maxsuel — Planejamento tributário, versão 0.3 de revisão
 
 **Cópia de desenvolvimento local, ainda sem comparação global validada.**
 
@@ -15,7 +15,13 @@ python -m pip install -r requirements.txt
 streamlit run testar_planejamento.py
 ```
 
-`testar_planejamento.py` abre inicialmente a prévia interativa do novo visual. No topo, escolha **Sistema original** para acessar os simuladores e módulos antigos, ou **Cálculos em revisão** para conferir a versão técnica. A prévia não apura tributos. O sistema original nessa entrada usa o banco separado `maxsuel_demonstracao.db`; as fórmulas antigas ainda precisam de revisão. Os arquivos que já existem no repositório são preservados pela branch. Use uma pasta separada para testar. `app.py` contém a integração técnica anterior com o sistema completo e acessa o SQLite existente.
+`app.py` e `testar_planejamento.py` abrem a interface operacional com logo e cenário compartilhado. Use o menu lateral para planejamento, Simples, salários, contabilidade, projeções, relatórios e cadastro CNPJ/QSA. **Ferramentas originais** preserva os módulos anteriores; **Ferramentas técnicas** mantém as apurações detalhadas.
+
+O banco padrão continua separado: `maxsuel_demonstracao.db`. O SQLite original e o CSV do repositório não são substituídos. Para um banco próprio, configure `MAXSUEL_DB_PATH` com um caminho gravável. Faça backup: o armazenamento local do Streamlit Community Cloud não garante persistência após reinicializações/reimplantações.
+
+O cadastro lê PDFs com texto do cartão CNPJ e, opcionalmente, um QSA separado. Exige conferência antes de salvar e não presume participação societária ou residência fiscal. PDFs de imagem precisam de OCR, ainda não implementado. Os documentos enviados não são publicados no GitHub.
+
+CSV contábil: datas e contas validadas, valores brasileiros, importação transacional e prevenção de duplicidade. Relatórios: PDF paginado e HTML com impressão no próprio documento. O IRRF dos dividendos é apresentado nos cenários, anexos, projeções e subtotais consolidados; a apuração mínima anual dos sócios ainda está pendente.
 
 Veja `COMO_TESTAR.md` para o passo a passo no computador ou em um aplicativo separado no Streamlit Community Cloud.
 

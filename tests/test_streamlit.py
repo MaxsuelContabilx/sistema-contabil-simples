@@ -7,6 +7,40 @@ import unittest
 
 @unittest.skipUnless(importlib.util.find_spec('streamlit'), 'Streamlit não instalado')
 class Interface(unittest.TestCase):
+    def test_botao_de_ferias_abre_recibo_com_salario_compartilhado(self):
+        from streamlit.testing.v1 import AppTest
+        logging.disable(logging.CRITICAL)
+        try:
+            app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/'app.py'),default_timeout=30).run()
+            app.radio(key='menu_principal').set_value('Equipe e salários').run()
+            app.number_input(key='salario_equipe').set_value(4000.0).run()
+            next(x for x in app.button if x.label=='Abrir simulador de férias e adiantamentos').click().run()
+            self.assertEqual(len(app.exception),0)
+            self.assertTrue(app.checkbox(key='calcular_ferias_legado').value)
+            self.assertTrue(any('Demonstrativo de Recibo de Férias' in x.value for x in app.subheader))
+            bruto=next(x for x in app.number_input if 'Salário Bruto do empregado' in x.label)
+            self.assertEqual(bruto.value,4000.0)
+        finally:logging.disable(logging.NOTSET)
+
+    def test_cenario_persistente_e_dividendos_nas_tres_alternativas(self):
+        from streamlit.testing.v1 import AppTest
+        logging.disable(logging.CRITICAL)
+        try:
+            app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/'app.py'),default_timeout=30).run()
+            app.number_input(key='sc_receita').set_value(65000.0)
+            app.number_input(key='sc_dividendo').set_value(60000.0)
+            app.selectbox(key='sc_tipo_div').set_value('PF residente no Brasil')
+            app.button(key='comparar_cenario').click().run()
+            self.assertEqual(len(app.exception),0)
+            valores=[x.value for x in app.metric if x.label=='IR sobre dividendos']
+            self.assertEqual(valores,['R$ 6.000,00']*3)
+            app.radio(key='menu_principal').set_value('Simples Nacional').run()
+            self.assertEqual(len(app.exception),0)
+            app.radio(key='menu_principal').set_value('Planejamento').run()
+            self.assertEqual(app.number_input(key='sc_receita').value,65000.0)
+            self.assertEqual(app.number_input(key='sc_dividendo').value,60000.0)
+        finally:logging.disable(logging.NOTSET)
+
     def test_acesso_ao_original_preserva_simulador_de_salario(self):
         from streamlit.testing.v1 import AppTest
         logging.disable(logging.CRITICAL)
@@ -15,14 +49,14 @@ class Interface(unittest.TestCase):
             banco=base/'maxsuel_contabilidade.db'
             antes=banco.read_bytes() if banco.exists() else None
             app=AppTest.from_file(str(base/'testar_planejamento.py'),default_timeout=30).run()
-            app.radio(key='modo_apresentacao').set_value('Sistema original').run()
+            app.radio(key='menu_principal').set_value('Ferramentas originais').run()
             self.assertEqual(len(app.exception),0)
             app.radio(key='nav_radio').set_value('📋 Módulo de Folha & Fator R').run()
             operacao=next(x for x in app.radio if x.label=='Escolha a Operação:')
             operacao.set_value('🧮 Simulador Prático de Salário Líquido (2026)').run()
             self.assertEqual(len(app.exception),0)
             self.assertTrue(any('Demonstrativo de Pagamento Mensal Emitido' in x.value for x in app.subheader))
-            self.assertTrue(any('Salário Bruto / Pró-Labore' in x.label for x in app.number_input))
+            self.assertTrue(any('Salário Bruto do empregado' in x.label for x in app.number_input))
             self.assertEqual(banco.read_bytes() if banco.exists() else None,antes)
         finally:
             logging.disable(logging.NOTSET)
@@ -30,14 +64,18 @@ class Interface(unittest.TestCase):
     def test_entrada_isolada_nao_abre_banco_contabil(self):
         from streamlit.testing.v1 import AppTest
         from unittest.mock import patch
+        import sqlite3
+        real_connect=sqlite3.connect
         logging.disable(logging.CRITICAL)
         try:
-            with patch('sqlite3.connect', side_effect=AssertionError('O teste isolado não deve abrir SQLite')) as conectar:
+            def somente_demo(caminho,*args,**kwargs):
+                self.assertFalse(str(caminho).endswith('maxsuel_contabilidade.db'))
+                return real_connect(caminho,*args,**kwargs)
+            with patch('sqlite3.connect', side_effect=somente_demo):
                 app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/'testar_planejamento.py'),default_timeout=30).run()
                 self.assertEqual(len(app.exception),0)
-                conectar.assert_not_called()
-                self.assertEqual(app.radio(key='modo_apresentacao').value, 'Prévia do novo visual')
-                self.assertTrue(any('PRÉVIA DE NAVEGAÇÃO' in x.value for x in app.caption))
+                self.assertEqual(app.radio(key='menu_principal').value, 'Planejamento')
+                self.assertTrue(any('Vamos planejar sua empresa?' in x.value for x in app.title))
         finally:
             logging.disable(logging.NOTSET)
 
@@ -47,7 +85,7 @@ class Interface(unittest.TestCase):
         try:
             app = AppTest.from_file(str(Path(__file__).resolve().parents[1] / 'app.py'), default_timeout=30).run()
             self.assertEqual(len(app.exception), 0)
-            app.radio[0].set_value('📊 Planejamento Tributário Comparativo').run()
+            app.radio(key='menu_principal').set_value('Ferramentas técnicas').run()
             self.assertEqual(len(app.exception), 0)
             self.assertEqual(len(app.button), 5)
             # Faturamento mensal ordinário de R$ 50 mil no Anexo I.
@@ -92,7 +130,7 @@ class Interface(unittest.TestCase):
         logging.disable(logging.CRITICAL)
         try:
             app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/'app.py'),default_timeout=30).run()
-            app.radio[0].set_value('📊 Planejamento Tributário Comparativo').run()
+            app.radio(key='menu_principal').set_value('Ferramentas técnicas').run()
             for widget in app.number_input:
                 if widget.label=='Receita de comércio no 1º mês (R$)':widget.set_value(50000.0)
             app.button[4].click().run()

@@ -1,20 +1,22 @@
 {
-  "versao": "0.2-revisao-2026",
-  "status": "parcial; não homologada; branch de testes",
-  "testes_motor_e_projecoes": 33,
-  "testes_interface": 4,
-  "total_testes": 37,
-  "entrada_isolada": "testar_planejamento.py",
-  "novidades": [
-    "projeção anual de 12 meses",
-    "memórias normativas versionadas",
-    "consulta de relatórios anteriores",
-    "entrada de testes sem SQLite",
-    "prévia de navegação e acesso ao sistema original com banco de demonstração"
+  "versao": "0.3-revisao-2026",
+  "status": "funcional para testes; apuração tributária ainda parcial",
+  "testes_automatizados": 62,
+  "fluxos_navegador": [
+    "cenário compartilhado",
+    "IR dos dividendos nos três regimes",
+    "download de PDF",
+    "acionamento do botão de impressão",
+    "cadastro por cartão CNPJ e QSA",
+    "importação CSV",
+    "prevenção de duplicados"
   ],
-  "limitacoes": [
-    "carga global pendente",
-    "2027 bloqueado até conferência de regras",
-    "fechamento com majoração da LC 224 pendente"
+  "banco": "maxsuel_demonstracao.db; original preservado",
+  "documentos_teste": "PDFs gerados com dados fictícios; sem PDF real de CNPJ do usuário nesta sessão",
+  "limites": [
+    "não testa impressora física",
+    "não recolhe ou transmite tributos",
+    "OCR não implementado",
+    "2027 e casos especiais continuam pendentes"
   ]
 }

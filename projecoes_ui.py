@@ -86,6 +86,9 @@ def renderizar_projecoes():
         entradas = dict(meses=grade.to_dict('records'), historico=historico.to_dict('records'),
             ano=ano, anexo_servicos=anexo, servicos_fator_r=fator, saldos_irpj=saldo_ir,
             saldos_csll=saldo_cs, ajustes=ajustes.to_dict('records'), confirmado=confirmado)
+        from plataforma_ui import iniciar,perfil
+        iniciar()
+        entradas['distribuicoes']=perfil()['distribuicoes']
         try:
             resultado = projetar_ano(**entradas)
         except (Pendente, ValueError, TypeError, KeyError) as exc:
@@ -99,6 +102,8 @@ def renderizar_projecoes():
             resumo.append({'Regime': nome, 'Componentes': 'DAS' if chave=='simples' else 'IRPJ + CSLL',
                 'Total anual dos componentes (R$)':
                     float(total['das'] if chave=='simples' else total['irpj']+total['csll']) if total['cobertura_completa'] else None,
+                'IRRF dos dividendos (R$)':float(total['irrf_dividendos']) if total['irrf_dividendos'] is not None else None,
+                'Subtotal + IRRF dos dividendos (R$)':float(total['subtotal_componentes_e_dividendos']) if total['subtotal_componentes_e_dividendos'] is not None else None,
                 'Situação': 'Componentes calculados; carga global parcial' if total['cobertura_completa'] else 'Pendente; total anual não apresentado'})
         st.dataframe(pd.DataFrame(resumo), hide_index=True, use_container_width=True)
         financeiro = pd.DataFrame(resultado['financeiro'])

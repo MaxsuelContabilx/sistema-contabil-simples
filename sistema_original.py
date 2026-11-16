@@ -1,3 +1,5 @@
+from plataforma_ui import ir_legado, importar_csv_legado, perfil
+from tax_engine import numero
 import streamlit as st
 import pandas as pd
 import os
@@ -230,7 +232,7 @@ def calcular_lucro_presumido(faturamento_mes, atividade, folha_mes=0.0, distribu
 
     # 4. Folha e Lucros
     inss_patronal = folha_mes * 0.278
-    irrf_distribuicao = max(0.0, (distribuicao_lucro - 50000.0) * 0.10) if distribuicao_lucro > 50000.0 else 0.0
+    irrf_distribuicao = ir_legado(distribuicao_lucro)
 
     tot_geral = tot_renda + tot_faturamento + inss_patronal + irrf_distribuicao
 
@@ -288,7 +290,7 @@ def calcular_lucro_real(faturamento_mes, despesas_op, insumos_cred, folha_mes=0.
 
     # 3. Folha e Lucros
     inss_patronal = folha_mes * 0.278
-    irrf_distribuicao = max(0.0, (distribuicao_lucro - 50000.0) * 0.10) if distribuicao_lucro > 50000.0 else 0.0
+    irrf_distribuicao = ir_legado(distribuicao_lucro)
 
     tot_geral = tot_renda + tot_faturamento + inss_patronal + irrf_distribuicao
 
@@ -405,7 +407,7 @@ else:
 TABELAS_PADRAO = {
     "Anexo I - Comércio": [(180000.0, 0.040, 0.0), (360000.0, 0.073, 5940.0), (720000.0, 0.095, 13860.0), (1800000.0, 0.107, 22500.0), (3600000.0, 0.143, 87300.0), (4800000.0, 0.190, 378000.0)],
     "Anexo II - Indústria": [(180000.0, 0.045, 0.0), (360000.0, 0.078, 5940.0), (720000.0, 0.100, 13860.0), (1800000.0, 0.112, 22500.0), (3600000.0, 0.147, 85500.0), (4800000.0, 0.300, 720000.0)],
-    "Anexo III - Serviços": [(180000.0, 0.060, 0.0), (360000.0, 0.112, 9360.0), (720000.0, 0.135, 17640.0), (1800000.0, 0.160, 35640.0), (3600000.0, 0.210, 125640.0), (4800000.0, 0.330, 848000.0)],
+    "Anexo III - Serviços": [(180000.0, 0.060, 0.0), (360000.0, 0.112, 9360.0), (720000.0, 0.135, 17640.0), (1800000.0, 0.160, 35640.0), (3600000.0, 0.210, 125640.0), (4800000.0, 0.330, 648000.0)],
     "Anexo IV - Serviços": [(180000.0, 0.045, 0.0), (360000.0, 0.090, 8100.0), (720000.0, 0.102, 12420.0), (1800000.0, 0.140, 39780.0), (3600000.0, 0.220, 183780.0), (4800000.0, 0.330, 828000.0)],
     "Anexo V - Serviços": [(180000.0, 0.155, 0.0), (360000.0, 0.180, 4500.0), (720000.0, 0.195, 9900.0), (1800000.0, 0.205, 17100.0), (3600000.0, 0.230, 62100.0), (4800000.0, 0.305, 540000.0)]
 }
@@ -579,30 +581,8 @@ elif st.session_state.pagina_selecionada == "💻 Módulo Contábil":
         st.title(f"📝 Livro Diário de Lançamentos")
         st.info(f"Gravando dados na empresa: **{empresa_selecionada}** (CNPJ: {cnpj_empresa_atual})")
         
-        st.subheader("📥 Importar Lançamentos via CSV")
-        arquivo_upload = st.file_uploader("Selecione seu arquivo CSV exportado do Excel (Separado por ponto e vírgula)", type=["csv"])
-        
-        if arquivo_upload is not None:
-            try:
-                df_importado = pd.read_csv(arquivo_upload, sep=";", encoding="utf-8-sig")
-                df_importado.columns = [col.replace("é", "e").replace("ó", "o").title() for col in df_importado.columns]
-                colunas_obrigatorias = ["Data", "Debito", "Credito", "Valor", "Historico"]
-                
-                if all(col in df_importado.columns for col in colunas_obrigatorias):
-                    if st.button("Confirmar Importação de Dados"):
-                        dados_novos = df_importado[colunas_obrigatorias].to_dict(orient="records")
-                        
-                        # Salva item por item vinculando a empresa ativa
-                        for item in dados_novos:
-                            salvar_lancamento_db(empresa_id_atual, item["Data"], item["Debito"], item["Credito"], item["Valor"], item["Historico"])
-                            
-                        st.success(f"{len(dados_novos)} lançamentos importados e vinculados à empresa '{empresa_selecionada}'!")
-                        st.rerun()
-                else:
-                    st.error("Erro: O arquivo precisa conter as colunas: Data, Debito, Credito, Valor, Historico.")
-            except Exception as e:
-                st.error(f"Erro ao processar o arquivo: {e}")
-                
+        importar_csv_legado(empresa_id_atual)
+
         st.divider()
 
         with st.form("form_lancamento", clear_on_submit=True):
@@ -1121,220 +1101,7 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
     # EXPORTAÇÃO E IMPRESSÃO COM LOGO (HTML IMPRIMÍVEL AUTOMÁTICO)
     # ==============================================================================
     st.divider()
-    st.subheader("🖨️ Imprimir Simulação")
-    
-    # Prepara os dados do Diagnóstico para o HTML
-    res_anexo_imp = resultados[0] if resultados else {}
-    dif_imp = res_anexo_imp.get("Diferença (R$)", 0)
-    
-    if dif_imp > 0:
-        html_diag_b2c = f"""
-        <div style="background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 10px 14px; margin-bottom: 10px; border-radius: 4px;">
-            <b style="color: #991b1b;">🔴 Recomendação Vendas B2C (Consumidor Final):</b><br>
-            <span style="font-size: 12px; color: #7f1d1d;">Mantendo no <b>Simples Tradicional</b> a empresa economiza até <b>{formatar_br(abs(dif_imp))}</b> por mês.</span>
-        </div>
-        """
-    elif dif_imp < 0:
-        html_diag_b2c = f"""
-        <div style="background-color: #f0fdf4; border-left: 4px solid #22c55e; padding: 10px 14px; margin-bottom: 10px; border-radius: 4px;">
-            <b style="color: #166534;">🟢 Recomendação Vendas B2C (Consumidor Final):</b><br>
-            <span style="font-size: 12px; color: #14532d;">Optar por <b>Recolher Por Fora</b> gera <b>{formatar_br(abs(dif_imp))}</b> de economia mensal!</span>
-        </div>
-        """
-    else:
-        html_diag_b2c = """
-        <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 10px 14px; margin-bottom: 10px; border-radius: 4px;">
-            <b style="color: #1e40af;">⚖️ Carga Equivalente:</b><br>
-            <span style="font-size: 12px; color: #1e3a8a;">Ambas as opções geram o mesmo valor total de tributação na operação.</span>
-        </div>
-        """
-
-    html_diag_b2b = """
-    <div style="background-color: #f0f9ff; border-left: 4px solid #0284c7; padding: 10px 14px; margin-bottom: 15px; border-radius: 4px;">
-        <b style="color: #075985;">🔵 Posicionamento Estratégico Vendas B2B (Empresas):</b><br>
-        <span style="font-size: 12px; color: #0c4a6e;">Apurar IBS/CBS por fora transfere <b>crédito tributário integral</b> aos clientes PJ.</span>
-    </div>
-    """
-
-    # Linhas do Painel Comparativo para a Tabela HTML
-    html_linhas_tabela = ""
-    for r in resultados:
-        das_trad = formatar_br(r["DAS Tradicional"]) if isinstance(r["DAS Tradicional"], (int, float)) else r["DAS Tradicional"]
-        das_red = formatar_br(r["DAS Reduzido"]) if isinstance(r["DAS Reduzido"], (int, float)) else r["DAS Reduzido"]
-        cbs_v = formatar_br(r["CBS Por Fora"]) if isinstance(r["CBS Por Fora"], (int, float)) else r["CBS Por Fora"]
-        ibs_v = formatar_br(r["IBS Por Fora"]) if isinstance(r["IBS Por Fora"], (int, float)) else r["IBS Por Fora"]
-        total_v = formatar_br(r["Carga Total (Reforma)"]) if isinstance(r["Carga Total (Reforma)"], (int, float)) else r["Carga Total (Reforma)"]
-        
-        cor_dif = "#ef4444" if r["Diferença (R$)"] > 0 else ("#22c55e" if r["Diferença (R$)"] < 0 else "#333")
-        dif_v = formatar_br(r["Diferença (R$)"]) if isinstance(r["Diferença (R$)"], (int, float)) else r["Diferença (R$)"]
-        
-        html_linhas_tabela += f"""
-        <tr>
-            <td>{r['Anexo']}</td>
-            <td>{das_trad}</td>
-            <td>{das_red}</td>
-            <td>{cbs_v}</td>
-            <td>{ibs_v}</td>
-            <td><b>{total_v}</b></td>
-            <td style="color: {cor_dif}; font-weight: bold;">{dif_v}</td>
-        </tr>
-        """
-        
-    # Rateio e Gráfico em HTML para a Folha 2 da Impressão
-    html_linhas_rateio = ""
-    html_barras_grafico = ""
-    
-    if not df_rateio_impressao.empty:
-        max_valor = df_rateio_impressao["Valor Destinado"].max() if df_rateio_impressao["Valor Destinado"].max() > 0 else 1
-        
-        for idx, row in df_rateio_impressao.iterrows():
-            v_format = formatar_br(row['Valor Destinado'])
-            pct = (row['Valor Destinado'] / max_valor) * 100
-            
-            html_linhas_rateio += f"<tr><td>{row['Imposto']}</td><td><b>{v_format}</b></td></tr>"
-            
-            html_barras_grafico += f"""
-            <div style="margin-bottom: 8px;">
-                <div style="font-size: 11px; margin-bottom: 2px; color: #475569;"><b>{row['Imposto']}:</b> {v_format}</div>
-                <div style="background-color: #e2e8f0; width: 100%; height: 14px; border-radius: 3px; overflow: hidden;">
-                    <div style="background-color: #0f2a4a; width: {pct:.1f}%; height: 100%;"></div>
-                </div>
-            </div>
-            """
-
-    logo_tag = f'<img class="logo" src="data:image/png;base64,{logo_base64}">' if logo_base64 else '<h2 style="color: #0f2a4a; margin:0;">MAXSUEL CONTABILIDADE</h2>'
-    data_atual = datetime.now().strftime("%d/%m/%Y às %H:%M")
-
-    html_template = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <title>Simulação Simples Nacional + Reforma Tributária - Maxsuel Contabilidade</title>
-        <style>
-            /* FORÇA A IMPRESSÃO DE CORES DE FUNDO E GRÁFICOS */
-            * {{
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-            }}
-
-            body {{ font-family: 'Segoe UI', Arial, sans-serif; margin: 25px; color: #333; line-height: 1.4; }}
-            .header {{ display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #0f2a4a; padding-bottom: 10px; margin-bottom: 15px; }}
-            .logo {{ max-height: 65px; max-width: 190px; object-fit: contain; }}
-            .header-info {{ text-align: right; font-size: 11px; color: #666; margin-bottom: 12px; }}
-            .title {{ color: #0f2a4a; font-size: 20px; font-weight: bold; margin: 0 0 3px 0; }}
-            .subtitle {{ color: #555; font-size: 13px; margin: 0; }}
-            .section-title {{ color: #0f2a4a; font-size: 14px; font-weight: bold; margin-top: 15px; margin-bottom: 8px; border-bottom: 1px solid #ddd; padding-bottom: 3px; }}
-            .grid-params {{ display: flex; flex-wrap: wrap; gap: 10px 25px; background-color: #f8fafc !important; padding: 10px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #e2e8f0; }}
-            .param-item {{ font-size: 11px; }}
-            
-            table {{ width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 11px; }}
-            th, td {{ border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; }}
-            th {{ background-color: #0f2a4a !important; color: white !important; font-weight: 600; font-size: 11px; }}
-            tr:nth-child(even) {{ background-color: #f8fafc !important; }}
-            
-            .footer {{ margin-top: 25px; text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 8px; }}
-            .page-break {{ page-break-before: always; break-before: page; }}
-            .flex-container {{ display: flex; gap: 20px; align-items: flex-start; margin-top: 10px; }}
-            
-            @media print {{
-                .btn-print {{ display: none; }}
-                body {{ margin: 15px; }}
-                * {{
-                    -webkit-print-color-adjust: exact !important;
-                    print-color-adjust: exact !important;
-                }}
-            }}
-        </style>
-    </head>
-    <body>
-        <div class="header">
-            <div>
-                <h1 class="title">Maxsuel Contabilidade</h1>
-                <p class="subtitle">Relatório Estratégico de Planejamento Tributário - Reforma Tributária</p>
-            </div>
-            <div>{logo_tag}</div>
-        </div>
-        
-        <div class="header-info">
-            Emitido em: {data_atual} | Competência Fiscal: 2026
-        </div>
-
-        <div class="section-title">Parâmetros de Entrada Aplicados</div>
-        <div class="grid-params">
-            <div class="param-item"><b>Receita Acumulada (RBT12):</b> {formatar_br(rbt12)}</div>
-            <div class="param-item"><b>Faturamento Projetado no Mês:</b> {formatar_br(faturamento_mes)}</div>
-            <div class="param-item"><b>Insumos c/ Crédito:</b> {formatar_br(compras_insumos)}</div>
-            <div class="param-item"><b>CBS Ref. / IBS Ref.:</b> {cbs_ref:.1f}% / {ibs_ref:.1f}%</div>
-            <div class="param-item"><b>Benefício LC 214:</b> {reducao_rotulo}</div>
-        </div>
-
-        <div class="section-title">Painel Comparativo de Cenários (Simples Unificado vs. IBS/CBS Por Fora)</div>
-        <table>
-            <thead>
-                <tr>
-                    <th>Anexo Fiscal</th>
-                    <th>DAS Tradicional</th>
-                    <th>DAS Reduzido</th>
-                    <th>CBS Por Fora</th>
-                    <th>IBS Por Fora</th>
-                    <th>Carga Total (Reforma)</th>
-                    <th>Diferença (R$)</th>
-                </tr>
-            </thead>
-            <tbody>
-                {html_linhas_tabela}
-            </tbody>
-        </table>
-
-        <div class="section-title">Diagnóstico Estratégico e Parecer Fiscal</div>
-        {html_diag_b2c}
-        {html_diag_b2b}
-
-        <!-- PÁGINA 2 DO PDF IMPRESSO -->
-        <div class="page-break"></div>
-        
-        <div class="section-title" style="margin-top: 20px;">Detalhamento de Rateio Interno da Guia - {anexo_detalhe} (DAS Tradicional)</div>
-        
-        <div class="flex-container">
-            <div style="flex: 1;">
-                <table style="width: 100%;">
-                    <thead>
-                        <tr>
-                            <th>Imposto / Ente Federativo</th>
-                            <th>Valor Destinado</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {html_linhas_rateio}
-                    </tbody>
-                </table>
-            </div>
-            
-            <div style="flex: 1; background-color: #f8fafc !important; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0;">
-                <b style="font-size: 12px; color: #0f2a4a; display: block; margin-bottom: 10px;">Distribuição Proporcional dos Impostos</b>
-                {html_barras_grafico}
-            </div>
-        </div>
-
-        <div class="footer">
-            Hub de Soluções Contábeis Maxsuel © 2026 - Documento gerado eletronicamente para suporte decisório estratégico.
-        </div>
-        
-        <script>
-            window.onload = function() {{ window.print(); }}
-        </script>
-    </body>
-    </html>
-    """
-    st.info("Clique no botão abaixo para gerar o arquivo de impressão. O relatório virá com a sua logomarca oficial e abrirá a tela de impressão do seu computador automaticamente.")
-    st.download_button(
-        label="🖨️ Baixar e Imprimir Relatório Fiscal",
-        data=html_template,
-        file_name=f"Simulacao_Simples_Nacional_Reforma_{datetime.now().strftime('%Y%m%d')}.html",
-        mime="text/html",
-        use_container_width=True
-    )
+    # Relatórios PDF/HTML são fornecidos pela plataforma ao final do módulo.
 
 # ==============================================================================
 # TELA 4: MÓDULO DE FOLHA & FATOR R
@@ -1342,7 +1109,7 @@ elif st.session_state.pagina_selecionada == "🧮 Simulador Simples Nacional":
 elif st.session_state.pagina_selecionada == "📋 Módulo de Folha & Fator R":
     st.title("📋 Painel Estratégico de DP: Folha & Fator R")
     
-    sub_aba_dp = st.radio("Escolha a Operação:", ["🔍 Análise do Fator R", "🧮 Simulador Prático de Salário Líquido (2026)"], horizontal=True)
+    sub_aba_dp = st.radio("Escolha a Operação:", ["🔍 Análise do Fator R", "🧮 Simulador Prático de Salário Líquido (2026)"], horizontal=True, key="operacao_folha")
     st.divider()
     
     if sub_aba_dp == "🔍 Análise do Fator R":
@@ -1372,15 +1139,15 @@ elif st.session_state.pagina_selecionada == "📋 Módulo de Folha & Fator R":
         st.markdown("Cálculo integrado com os novos tetos de INSS, deduções legais e regras de férias.")
         
         st.sidebar.header("⚙️ Parâmetros do Trabalhador")
-        salario_bruto = st.sidebar.number_input("Salário Bruto / Pró-Labore (R$):", min_value=0.00, value=6500.00, step=100.00, format="%.2f")
-        num_dependentes = st.sidebar.number_input("Número de Dependentes:", min_value=0, value=0, step=1)
+        salario_bruto = st.sidebar.number_input("Salário Bruto do empregado (R$):", min_value=0.00, value=float(st.session_state.get("salario_equipe",6500.0)), step=100.00, format="%.2f")
+        num_dependentes = st.sidebar.number_input("Número de Dependentes:", min_value=0, value=int(st.session_state.get("dependentes_equipe",0)), step=1)
         
         st.sidebar.subheader("❌ Descontos Legais (Mensais)")
         valor_faltas = st.sidebar.number_input("Valor de Faltas (R$):", min_value=0.00, value=0.00, step=50.00, format="%.2f")
         valor_atrasos = st.sidebar.number_input("Valor de Atrasos/DSR (R$):", min_value=0.00, value=0.00, step=10.00, format="%.2f")
         
         st.sidebar.subheader("🏖️ Opções de Férias")
-        calcular_ferias = st.sidebar.checkbox("Simular Recibo de Férias?")
+        calcular_ferias = st.sidebar.checkbox("Simular Recibo de Férias?",key="calcular_ferias_legado")
         
         dias_gozo = 30
         abono_pecuniario = False
@@ -1396,28 +1163,13 @@ elif st.session_state.pagina_selecionada == "📋 Módulo de Folha & Fator R":
         salario_sujeito_encargos = max(0.0, salario_bruto - total_descontos_legais)
         
         def calcular_inss_2026(valor_base):
-            teto_inss = 8475.55
-            salario_calculo_inss = min(valor_base, teto_inss)
-            if salario_calculo_inss <= 1621.00: return salario_calculo_inss * 0.075
-            elif salario_calculo_inss <= 2902.84: return (salario_calculo_inss * 0.090) - 24.32
-            elif salario_calculo_inss <= 4354.27: return (salario_calculo_inss * 0.120) - 111.40
-            else: return (salario_calculo_inss * 0.140) - 198.49
+            from folha import inss_empregado
+            return float(inss_empregado(valor_base))
 
         def calcular_irrf_2026(valor_base, inss_retido, dependentes):
-            deducao_dependentes = dependentes * 189.59
-            base_irrf = max(0.0, valor_base - inss_retido - deducao_dependentes)
-            
-            if base_irrf <= 2259.20: irrf_bruto = 0.0
-            elif base_irrf <= 2826.65: irrf_bruto = (base_irrf * 0.075) - 169.44
-            elif base_irrf <= 3751.05: irrf_bruto = (base_irrf * 0.150) - 381.44
-            elif base_irrf <= 4664.68: irrf_bruto = (base_irrf * 0.225) - 662.77
-            else: irrf_bruto = (base_irrf * 0.275) - 896.00
-                
-            if base_irrf <= 5000.00: reducao = min(irrf_bruto, 312.89)
-            elif base_irrf <= 7350.00: reducao = max(0.0, 978.62 - (0.133145 * base_irrf))
-            else: reducao = 0.0
-                
-            return max(0.0, irrf_bruto - reducao), base_irrf, reducao
+            from folha import irrf_mensal
+            r=irrf_mensal(valor_base,inss_retido,int(dependentes))
+            return float(r['irrf']),float(r['base']),float(r['reducao'])
 
         if calcular_ferias:
             st.subheader("🏖️ Demonstrativo de Recibo de Férias")
@@ -1491,200 +1243,7 @@ elif st.session_state.pagina_selecionada == "📋 Módulo de Folha & Fator R":
 # TELA 5: PLANEJAMENTO TRIBUTÁRIO COMPARATIVO TRÍPLICE (REFORMA & +10% PRESUNÇÃO)
 # ==============================================================================
 elif st.session_state.pagina_selecionada == "📊 Planejamento Tributário Comparativo":
-    st.title("📊 Planejamento Tributário Comparativo (Simples x Presumido x Real)")
-
-    # --- SELETOR DE MODELO NO INÍCIO DA SIMULAÇÃO ---
-    st.markdown("### ⚙️ Configuração da Legislação")
-    modelo_tributario = st.selectbox(
-        "Selecione o Modelo de Tributação de Consumo:",
-        ["Modelo Atual (PIS / COFINS / ICMS / ISS)", "Modelo Pós-Reforma Tributária (CBS / IBS)"],
-        help="Altera dinamicamente as regras e nomenclaturas dos impostos sobre vendas/serviços."
-    )
-    
-    st.info(f"💡 Presunções do Lucro Presumido reajustadas em **+10%** conforme novos parâmetros fiscais. Modelo Selecionado: **{modelo_tributario}**")
-    st.divider()
-
-    st.subheader("📥 Parâmetros Financeiros e Operacionais")
-    col_i1, col_i2, col_i3 = st.columns(3)
-    fat_mes = col_i1.number_input("Faturamento Estimado do Mês (R$):", min_value=0.0, value=50000.0, step=5000.0)
-    rbt12_comp = col_i2.number_input("RBT12 (Simples Nacional - R$):", min_value=0.0, value=600000.0, step=10000.0)
-    atividade = col_i3.selectbox("Atividade Principal:", ["Comércio / Indústria", "Serviços em Geral"])
-
-    col_i4, col_i5, col_i6 = st.columns(3)
-    despesas_op = col_i4.number_input("Despesas Operacionais (Mês):", min_value=0.0, value=20000.0, step=2000.0)
-    insumos_cred = col_i5.number_input("Compras c/ Crédito PIS/COFINS ou CBS/IBS:", min_value=0.0, value=10000.0, step=1000.0)
-    folha_comp = col_i6.number_input("Folha / Pró-Labore (Mês):", min_value=0.0, value=8000.0, step=1000.0)
-
-    col_i7, col_i8 = st.columns(2)
-    anexo_simples = col_i7.selectbox("Anexo no Simples Nacional:", list(TABELAS_PADRAO.keys()))
-    distribuicao_lucro = col_i8.number_input("Distribuição de Lucros (Mês):", min_value=0.0, value=0.0, step=5000.0, help="Parcelas > R$ 50.000 retêm 10% de IRRF pela Lei 15.270.")
-
-    # --- CÁLCULOS ---
-    faixas = TABELAS_PADRAO[anexo_simples]
-    aliq_nom, deducao = 0.0, 0.0
-    for limite, aliq, ded in faixas:
-        if rbt12_comp <= limite:
-            aliq_nom, deducao = aliq, ded
-            break
-    
-    aliq_efetiva_simples = max(0.0, ((rbt12_comp * aliq_nom) - deducao) / rbt12_comp) if rbt12_comp > 0 else aliq_nom
-    imposto_simples = fat_mes * aliq_efetiva_simples
-    inss_simples = (folha_comp * 0.20) if "Anexo IV" in anexo_simples else 0.0
-    irrf_lucros_simples = max(0.0, (distribuicao_lucro - 50000.0) * 0.10) if distribuicao_lucro > 50000.0 else 0.0
-    total_simples = imposto_simples + inss_simples + irrf_lucros_simples
-
-    res_presumido = calcular_lucro_presumido(fat_mes, atividade, folha_comp, distribuicao_lucro, modelo_tributario)
-    res_real = calcular_lucro_real(fat_mes, despesas_op, insumos_cred, folha_comp, distribuicao_lucro, modelo_tributario)
-
-    # --- TELA: PAINEL DE SÍNTESE ---
-    st.divider()
-    st.subheader("⚖️ Resumo Consolidado de Carga Tributária")
-
-    lbl_faturamento = "Impostos s/ Venda (PIS/COFINS/ICMS)" if "Atual" in modelo_tributario else "Impostos s/ Venda (CBS/IBS)"
-
-    df_resumo = pd.DataFrame([
-        {
-            "Regime": "Simples Nacional",
-            lbl_faturamento: formatar_br(imposto_simples),
-            "Tributos s/ Renda (IR/CS)": "Incluso no DAS",
-            "INSS Patronal": formatar_br(inss_simples),
-            "IRRF Lucros (>50k)": formatar_br(irrf_lucros_simples),
-            "Carga Total": formatar_br(total_simples),
-            "Alíquota Efetiva": f"{(total_simples/fat_mes*100) if fat_mes > 0 else 0:.2f}%"
-        },
-        {
-            "Regime": "Lucro Presumido",
-            lbl_faturamento: formatar_br(res_presumido["Subtotal Faturamento"]),
-            "Tributos s/ Renda (IR/CS)": formatar_br(res_presumido["Subtotal Renda"]),
-            "INSS Patronal": formatar_br(res_presumido["INSS Patronal"]),
-            "IRRF Lucros (>50k)": formatar_br(res_presumido["IRRF Lucros (>50k)"]),
-            "Carga Total": formatar_br(res_presumido["Total Tributos"]),
-            "Alíquota Efetiva": f"{res_presumido['Aliquota Efetiva']:.2f}%"
-        },
-        {
-            "Regime": "Lucro Real",
-            lbl_faturamento: formatar_br(res_real["Subtotal Faturamento"]),
-            "Tributos s/ Renda (IR/CS)": formatar_br(res_real["Subtotal Renda"]),
-            "INSS Patronal": formatar_br(res_real["INSS Patronal"]),
-            "IRRF Lucros (>50k)": formatar_br(res_real["IRRF Lucros (>50k)"]),
-            "Carga Total": formatar_br(res_real["Total Tributos"]),
-            "Alíquota Efetiva": f"{res_real['Aliquota Efetiva']:.2f}%"
-        }
-    ])
-    st.table(df_resumo)
-
-    # --- EXPANDERS COM DADOS DINÂMICOS PIS/COFINS OU CBS/IBS ---
-    st.subheader("🔍 Detalhamento das Bases e Composição de Apuração")
-
-    with st.expander("📌 Ver Memória de Cálculo - Lucro Presumido", expanded=False):
-        col_p1, col_p2 = st.columns(2)
-        with col_p1:
-            st.markdown("**Tributação sobre a Renda (IRPJ e CSLL):**")
-            st.write(f"- Presunção Aplicada (+10%): `{res_presumido['Base IRPJ/CSLL']}`")
-            st.write(f"- IRPJ (15% + Adicional 10%): **{formatar_br(res_presumido['IRPJ'])}**")
-            st.write(f"- CSLL (9%): **{formatar_br(res_presumido['CSLL'])}**")
-        with col_p2:
-            st.markdown(f"**Tributação sobre Consumo/Vendas ({'Modelo Atual' if 'Atual' in modelo_tributario else 'Pós-Reforma'}):**")
-            st.write(f"- {res_presumido['Label Trib 1']}: **{formatar_br(res_presumido['Val Trib 1'])}**")
-            st.write(f"- {res_presumido['Label Trib 2']}: **{formatar_br(res_presumido['Val Trib 2'])}**")
-            st.write(f"- INSS Patronal (27,8% s/ folha): **{formatar_br(res_presumido['INSS Patronal'])}**")
-
-    with st.expander("📌 Ver Memória de Cálculo - Lucro Real", expanded=False):
-        col_r1, col_r2 = st.columns(2)
-        with col_r1:
-            st.markdown("**Tributação sobre a Renda (IRPJ e CSLL):**")
-            st.write(f"- Base do Lucro Real: `{res_real['Base IRPJ/CSLL']}`")
-            st.write(f"- IRPJ (15% + Adicional 10%): **{formatar_br(res_real['IRPJ'])}**")
-            st.write(f"- CSLL (9%): **{formatar_br(res_real['CSLL'])}**")
-        with col_r2:
-            st.markdown(f"**Tributação sobre Consumo/Vendas ({'Modelo Atual' if 'Atual' in modelo_tributario else 'Pós-Reforma'}):**")
-            st.write(f"- {res_real['Label Trib 1']}: **{formatar_br(res_real['Val Trib 1'])}**")
-            st.write(f"- {res_real['Label Trib 2']}: **{formatar_br(res_real['Val Trib 2'])}**")
-            st.write(f"- INSS Patronal (27,8% s/ folha): **{formatar_br(res_real['INSS Patronal'])}**")
-
-    # Destaque Final
-    menor_valor = min([total_simples, res_presumido["Total Tributos"], res_real["Total Tributos"]])
-    if menor_valor == total_simples:
-        vencedor = "Simples Nacional"
-    elif menor_valor == res_presumido["Total Tributos"]:
-        vencedor = "Lucro Presumido"
-    else:
-        vencedor = "Lucro Real"
-
-    st.success(f"🏆 **Cenário Mais Vantajoso:** O **{vencedor}** apresenta a menor carga fiscal global de **{formatar_br(menor_valor)}**.")
-    
-# ==============================================================================
-# FINAL DA TELA 5: MONTAGEM E IMPRESSÃO INTEGRAIS DO RELATÓRIO EXECUTIVO
-# ==============================================================================
-    menor_valor = min([total_simples, res_presumido["Total Tributos"], res_real["Total Tributos"]])
-    
-    if menor_valor == total_simples:
-        vencedor_nome = "Simples Nacional"
-    elif menor_valor == res_presumido["Total Tributos"]:
-        vencedor_nome = "Lucro Presumido"
-    else:
-        vencedor_nome = "Lucro Real"
-
-    # 1. Dicionário de Parâmetros de Entrada
-    params = {
-        "Faturamento Mensal": formatar_br(fat_mes),
-        "RBT12 (Simples)": formatar_br(rbt12_comp),
-        "Atividade": atividade,
-        "Despesas Operacionais": formatar_br(despesas_op),
-        "Insumos c/ Crédito": formatar_br(insumos_cred),
-        "Folha / Pró-Labore": formatar_br(folha_comp),
-        "Modelo Tributário": modelo_tributario,
-        "Anexo Simples": anexo_simples,
-        "Distribuição de Lucro": formatar_br(distribuicao_lucro)
-    }
-
-    lbl_faturam = "Impostos s/ Venda (PIS/COFINS/ICMS)" if "Atual" in modelo_tributario else "Impostos s/ Venda (CBS/IBS)"
-    colunas = ["Regime Tributário", lbl_faturam, "Tributos s/ Renda", "INSS Patronal", "IRRF Lucros (>50k)", "Carga Total (R$)", "Alíquota Efetiva"]
-
-    dados = [
-        ["Simples Nacional", formatar_br(imposto_simples), "Incluso no DAS", formatar_br(inss_simples), formatar_br(irrf_lucros_simples), formatar_br(total_simples), f"{(total_simples/fat_mes*100) if fat_mes > 0 else 0:.2f}%"],
-        ["Lucro Presumido", formatar_br(res_presumido["Subtotal Faturamento"]), formatar_br(res_presumido["Subtotal Renda"]), formatar_br(res_presumido["INSS Patronal"]), formatar_br(res_presumido["IRRF Lucros (>50k)"]), formatar_br(res_presumido["Total Tributos"]), f"{res_presumido['Aliquota Efetiva']:.2f}%"],
-        ["Lucro Real", formatar_br(res_real["Subtotal Faturamento"]), formatar_br(res_real["Subtotal Renda"]), formatar_br(res_real["INSS Patronal"]), formatar_br(res_real["IRRF Lucros (>50k)"]), formatar_br(res_real["Total Tributos"]), f"{res_real['Aliquota Efetiva']:.2f}%"]
-    ]
-
-    # 2. Dicionários para Memória de Cálculo no Relatório
-    mem_presumido = {
-        "Presunção Aplicada (+10%)": res_presumido["Base IRPJ/CSLL"],
-        "IRPJ (15% + Adicional)": formatar_br(res_presumido["IRPJ"]),
-        "CSLL (9%)": formatar_br(res_presumido["CSLL"]),
-        res_presumido["Label Trib 1"]: formatar_br(res_presumido["Val Trib 1"]),
-        res_presumido["Label Trib 2"]: formatar_br(res_presumido["Val Trib 2"]),
-        "INSS Patronal (27,8%)": formatar_br(res_presumido["INSS Patronal"])
-    }
-
-    mem_real = {
-        "Base Lucro Real": res_real["Base IRPJ/CSLL"],
-        "IRPJ (15% + Adicional)": formatar_br(res_real["IRPJ"]),
-        "CSLL (9%)": formatar_br(res_real["CSLL"]),
-        res_real["Label Trib 1"]: formatar_br(res_real["Val Trib 1"]),
-        res_real["Label Trib 2"]: formatar_br(res_real["Val Trib 2"]),
-        "INSS Patronal (27,8%)": formatar_br(res_real["INSS Patronal"])
-    }
-
-    rec = f"O regime do <strong>{vencedor_nome}</strong> apresenta a menor carga tributária total, gerando um desembolso estimado de <strong>{formatar_br(menor_valor)}</strong> por mês."
-    obs = f"Cenário apurado sob o <strong>{modelo_tributario}</strong>. Presunções do Lucro Presumido reajustadas em +10% e retenções da Lei nº 15.270 incidentes sobre parcelas de lucros que superam R$ 50.000,00/mês."
-
-   # 3. Geração e Exibição do Link de Impressão Direta
-    html_final = gerar_relatorio_html(
-        "Relatório Estratégico de Planejamento Tributário Comparativo", 
-        params, colunas, dados, mem_presumido, mem_real, rec, obs
-    )
-
-    b64 = base64.b64encode(html_final.encode('utf-8')).decode('utf-8')
-    nome_arquivo = f"Simulacao_Planejamento_Tributario_{datetime.now().strftime('%Y%m%d%H%M')}.html"
-
-    st.markdown(
-        f'''
-        <a href="data:text/html;charset=utf-8;base64,{b64}" download="{nome_arquivo}" target="_blank" 
-           style="display: inline-block; background-color: #0f172a; color: white; padding: 12px 24px; 
-                  text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px;">
-            🖨️ Gerar e Imprimir Relatório Executivo
-        </a>
-        ''',
-        unsafe_allow_html=True
-    )
+    from plataforma_ui import mostrar_comparacao
+    st.title("Planejamento Tributário Comparativo")
+    st.caption("A comparação usa o cenário compartilhado e inclui o IR dos dividendos. Ajuste os dados no menu Planejamento.")
+    mostrar_comparacao()

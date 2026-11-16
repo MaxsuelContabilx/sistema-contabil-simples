@@ -15,8 +15,24 @@ def serializar(obj):
 def mostrar(resultado, entradas, nome):
     st.warning('Resultado parcial. Não representa carga tributária total ou recomendação de regime.')
     from regras import fotografia_regras
-    dados = {'modulo': nome, 'versao': '0.2-revisao-2026', 'entradas': entradas,
+    dados = {'modulo': nome, 'versao': '0.3-revisao-2026', 'entradas': entradas,
              'fotografia_normativa': resultado.get('regras') or fotografia_regras(2026), 'resultado': resultado}
+    if nome in ('simples','presumido','real'):
+        from plataforma_ui import iniciar,perfil
+        from cenario import ir_dividendos_cenario
+        from tax_engine import Pendente
+        iniciar();p=perfil()
+        try:
+            meses=[entradas.get('mes',p['mes'])] if nome=='simples' else list(range((entradas.get('trimestre',1)-1)*3+1,entradas.get('trimestre',1)*3+1))
+            divs=[ir_dividendos_cenario(p['distribuicoes'],ano=2026,mes=m,fonte=p['empresa']) for m in meses]
+            ir=sum((x['irrf'] for x in divs),0)
+            base=resultado.get('das') if nome=='simples' else resultado.get('irpj',0)+resultado.get('csll',0)
+            dados['dividendos_do_cenario']={'meses':meses,'irrf':ir,'detalhes':divs,'subtotal_componentes_e_irrf':base+ir,
+                'nota':'Subtotal dos componentes calculados, não carga tributária global. Retenção dos sócios não é nova despesa da empresa.'}
+            st.info(f'IR dos dividendos previsto no mesmo período: R$ {ir:,.2f}. Subtotal dos componentes + IRRF: R$ {base+ir:,.2f}.')
+        except Pendente as exc:
+            dados['dividendos_do_cenario']={'irrf':None,'pendencia':str(exc)}
+            st.warning('IR dos dividendos pendente: '+str(exc))
     campos = [(k, v) for k, v in resultado.items() if k in ('das', 'irpj', 'csll', 'irrf')]
     colunas = st.columns(max(1, len(campos)))
     for coluna, (nome_campo, valor) in zip(colunas, campos):

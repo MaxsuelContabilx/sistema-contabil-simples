@@ -16,7 +16,7 @@ def fotografia_regras(ano):
         raise Pendente('Não há conjunto de regras conferido para todo esse ano. Não repetir automaticamente as regras de 2026.')
     # Inclui o código efetivamente executado, não só a descrição do catálogo.
     codigos = {nome: sha256(Path(__file__).with_name(nome).read_bytes()).hexdigest()
-               for nome in ('tax_engine.py', 'projecoes.py', 'regras.py')}
+               for nome in ('tax_engine.py', 'projecoes.py', 'regras.py', 'cenario.py', 'folha.py')}
     dados = {'versao': versoes[0], 'tabelas': TABELAS, 'atividades': ATIVIDADES,
              'fundamentos': FONTES, 'codigo_sha256': codigos}
     serializado = json.dumps(dados, default=str, sort_keys=True, ensure_ascii=False)

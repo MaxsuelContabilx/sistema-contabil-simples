@@ -44,6 +44,7 @@ FONTES = {
     'presumido': 'Lei 9.249/1995, arts. 3º, 15 e 20; Lei 9.430/1996, arts. 1º, 25 e 26; LC 224/2025, art. 4º, § 4º, VII, e § 5º.',
     'real': 'DL 1.598/1977, art. 6º; Lei 9.249/1995, art. 3º; Lei 7.689/1988, arts. 2º e 3º; Lei 9.065/1995, arts. 15 e 16.',
     'dividendos': 'Lei 15.270/2025, art. 2º, que inclui o art. 6º-A na Lei 9.250/1995; arts. 16-A e 16-B para o ajuste anual.',
+    'folha': 'INSS de empregado: Portaria MPS/MF 13/2026. IRRF mensal: Leis 15.191/2025 e 15.270/2025; tabelas oficiais de 2026 da Receita Federal.',
 }
 
 # Tuplas (teto da faixa, alíquota nominal, parcela a deduzir).

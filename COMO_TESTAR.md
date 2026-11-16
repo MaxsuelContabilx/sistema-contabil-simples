@@ -1,29 +1,56 @@
-# Como testar a versão revisada
+# Como testar a plataforma Maxsuel — versão 0.3
 
-Esta é uma versão parcial para avaliação, com projeções anuais e regras tributárias em revisão. Não atualiza o sistema em produção nem homologa apurações fiscais.
+Se você já abriu o aplicativo de testes, use o mesmo endereço e atualize com **Ctrl + F5** depois que o Streamlit concluir a atualização. Agora a página inicial é o planejamento com logo e menu lateral, não a prévia estática.
 
-## O que abre agora
+## Planejamento
 
-A entrada `testar_planejamento.py` abre inicialmente a **Prévia do novo visual**, no mesmo aplicativo de testes. Use os menus da prévia para experimentar o preenchimento único e o fluxo de empresa em abertura. Os valores tributários não são calculados nessa prévia.
+1. Selecione uma empresa cadastrada ou dê um nome ao cenário.
+2. Escolha **Vai começar agora** ou **Já está funcionando**.
+3. Informe atividade, faturamento, custos, salários e pró-labore uma vez.
+4. Em **Lucros e dividendos dos sócios**, informe o beneficiário e quanto prevê distribuir. O QSA cadastrado pode ser reaproveitado, sem presumir participações ou residência fiscal.
+5. Clique em **Comparar os três regimes**. A comparação distingue tributos da empresa, IR dos dividendos e total consolidado.
+6. Se um imposto estiver pendente, abra **Atividade, impostos e particularidades**. Informe zero somente quando realmente não houver aquele tributo.
 
-No topo da página há outras duas opções:
+As previsões são mantidas ao navegar pelo Simples, salários, relatórios e projeções. São hipóteses de planejamento, não apuração fiscal definitiva. O fator R e as regras de abertura não usam um histórico fictício.
 
-- **Sistema original:** recupera seu logo, a navegação e os simuladores originais de Simples, fator R, salários individuais, férias e contabilidade. Usa o banco separado `maxsuel_demonstracao.db`; as fórmulas antigas continuam identificadas como pendentes de revisão.
-- **Cálculos em revisão:** abre a versão técnica disponibilizada anteriormente, com as limitações já documentadas.
+## Empresa por PDF e QSA
 
-Se você estava com o aplicativo aberto antes dessa atualização, recarregue a página depois que o Streamlit terminar de atualizar. O novo topo mostra as três opções acima.
+1. Abra **Empresas e sócios**.
+2. Envie o cartão CNPJ em PDF com texto. O QSA, quando disponível, é um segundo PDF, pois normalmente não consta do cartão.
+3. Clique em **Ler os documentos**.
+4. Confira e corrija os campos e os sócios. Confirme o QSA somente se corresponder à empresa.
+5. Marque a conferência e clique em **Salvar cadastro da empresa**. A empresa passa a ficar selecionada no menu lateral.
+6. Se o CNPJ já existir, marque explicitamente a atualização do cadastro. Um cartão sem QSA não apaga sócios já registrados.
 
-## Baixar
+PDFs escaneados como imagem exigem OCR, ainda não disponível. Se o leiaute não for reconhecido, os campos ficam para conferência ou preenchimento manual. A leitura não consulta a Receita nem autentica o documento.
 
-1. Abra a branch `revisao-planejamento-tributario-v02` no GitHub.
-2. Clique em **Code → Download ZIP**.
-3. Extraia o ZIP em uma pasta nova do computador. Não extraia sobre a pasta usada em produção.
+## Importar lançamentos
+
+1. Abra **Contabilidade** e confira a empresa de destino.
+2. Baixe o modelo de CSV e preencha Data, Debito, Credito, Valor e Historico.
+3. Envie o arquivo. O formato brasileiro `1.234,56` é aceito, assim como datas `DD/MM/AAAA` e `AAAA-MM-DD`.
+4. Confira a prévia. Datas, contas ou valores inválidos impedem a gravação do lote inteiro.
+5. Confirme e importe. Ao repetir o arquivo, os lançamentos iguais são ignorados. Só permita iguais explicitamente quando forem operações distintas.
+
+Os módulos originais de lançamentos manuais, DRE, balancete e balanço permanecem em **Ferramentas originais**, usando o mesmo banco de demonstração.
+
+## Imprimir
+
+Nos resultados, use **Baixar relatório em PDF**, **Baixar versão para impressão** ou abra **Imprimir agora** e clique em **Imprimir relatório** dentro do documento. O PDF pode ser aberto no navegador e impresso normalmente. O relatório comparativo também permite baixar a memória JSON com premissas e regras.
+
+## Salários e férias
+
+Em **Equipe e salários**, informe o salário individual e os dependentes para a simulação mensal de empregado. O total da equipe pode ser levado ao planejamento com um clique. O botão de férias abre o simulador preservado, com exportação de demonstrativos. Situações fora do recorte geral continuam exigindo conferência técnica.
+
+## Projeções
+
+**Projeção de 1 ano** aproveita o cenário e gera 12 meses financeiros, com a retenção projetada dos dividendos apresentada separadamente. A projeção tributária detalhada por trimestre continua em **Ferramentas técnicas**. Regras ainda não revisadas, incluindo 2027, ficam pendentes.
 
 ## Executar no computador
 
-É necessário ter Python 3.11 ou 3.12 instalado. Abra um terminal na pasta extraída que contém `testar_planejamento.py`.
+Baixe a branch `revisao-planejamento-tributario-v02` em **Code → Download ZIP** e extraia em uma pasta nova. É necessário Python 3.11 ou 3.12.
 
-No Windows:
+Windows:
 
 ```powershell
 py -m venv .venv
@@ -31,7 +58,7 @@ py -m venv .venv
 .venv\Scripts\python -m streamlit run testar_planejamento.py
 ```
 
-No Linux ou macOS:
+Linux/macOS:
 
 ```sh
 python3 -m venv .venv
@@ -39,44 +66,14 @@ python3 -m venv .venv
 .venv/bin/python -m streamlit run testar_planejamento.py
 ```
 
-O navegador deve abrir o endereço local informado pelo Streamlit, normalmente `http://localhost:8501`. A prévia e os cálculos em revisão não abrem o SQLite contábil. A opção Sistema original usa exclusivamente o banco de demonstração separado.
+No Streamlit Community Cloud, o aplicativo de testes deve usar o repositório `MaxsuelContabilx/sistema-contabil-simples`, a branch `revisao-planejamento-tributario-v02` e `testar_planejamento.py` como arquivo principal. `app.py` também abre a nova plataforma.
 
-## Alternativa: outro aplicativo no Streamlit Community Cloud
+O banco padrão é `maxsuel_demonstracao.db`. O banco e o CSV originais não são substituídos. Faça backup dos cadastros e lançamentos: o armazenamento local do Streamlit Community Cloud não garante persistência após reinicializações.
 
-Se você usa esse serviço e quer testar pelo navegador, crie um aplicativo separado com:
-
-- Repositório: `MaxsuelContabilx/sistema-contabil-simples`.
-- Branch: `revisao-planejamento-tributario-v02`.
-- Arquivo principal: `testar_planejamento.py`.
-- Python: 3.11 ou 3.12.
-
-Mantenha o aplicativo atual apontando para a branch e o arquivo que ele já utiliza. Criar a branch no GitHub não publica automaticamente esse aplicativo de teste.
-
-## Primeiro teste simples
-
-1. Abra **Simples Nacional**.
-2. Informe RBT12 de R$ 600.000,00.
-3. Na receita ordinária do Anexo I, informe R$ 50.000,00.
-4. Confirme os requisitos indicados na tela somente se o cenário atender a eles.
-5. O DAS parcial esperado é R$ 3.595,00, sem tratamentos especiais. Baixe a memória de cálculo em JSON ou HTML.
-
-## Projeção de um ano
-
-1. Abra **Projeção de 1 ano** e selecione 2026.
-2. Informe as premissas iniciais e clique em **Preencher os 12 meses com estas premissas**.
-3. Ajuste as receitas, custos e despesas de cada mês para representar sazonalidade.
-4. Informe o histórico de receita e FS legal dos 12 meses anteriores, sem substituir informação ausente por média.
-5. Preencha as bases contábeis de IRPJ/CSLL, os outros acréscimos do Presumido, os saldos iniciais e eventuais ajustes do Real. Informe zero explicitamente quando for o caso.
-6. Confira os enquadramentos e clique em **Projetar os 12 meses**.
-
-Se um componente estiver pendente, o sistema informa o motivo e não apresenta um total anual incompleto como se fosse definitivo. O total de DAS não equivale à soma de IRPJ/CSLL dos demais regimes; a carga global ainda não está concluída. As regras de 2027 permanecem bloqueadas até a conferência correspondente.
-
-## Conferir testes automatizados
-
-No ambiente Python com as dependências instaladas:
+Testes:
 
 ```sh
 python -m unittest discover -s tests -v
 ```
 
-Leia `documentacao/REVISAO_TECNICA.md` e `documentacao/ATUALIZACOES.md` para as limitações e o histórico das melhorias. Não incorpore a branch de testes à `main` apenas por conseguir abrir as telas.
+Leia `documentacao/VERSAO_03.md` para o escopo implementado, as fontes e as pendências.

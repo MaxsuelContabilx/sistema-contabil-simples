@@ -97,6 +97,14 @@ class Projecoes(unittest.TestCase):
     def test_2027_exige_regras_proprias(self):
         with self.assertRaises(Pendente):projetar_ano(**self.entradas(),ano=2027)
 
+    def test_ir_dividendos_anual_aparece_em_todos_os_regimes(self):
+        result=projetar_ano(**self.entradas(),distribuicoes=[dict(nome='Sócio 1',tipo='PF_RESIDENTE',origem='2026',valor='60000')])
+        self.assertEqual(result['dividendos']['irrf_anual'],D('72000'))
+        for regime in ('simples','presumido','real'):
+            anual=result[regime]['anual']
+            self.assertEqual(anual['irrf_dividendos'],D('72000'))
+            self.assertIsNotNone(anual['subtotal_componentes_e_dividendos'])
+
     def test_memoria_salva_nao_recalculada_e_detecta_snapshot_alterado(self):
         dados=dict(entradas={'premissa':'original'},resultado={'valor':'123.45'},
                    fotografia_normativa=fotografia_regras(2026))

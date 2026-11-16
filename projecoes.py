@@ -29,7 +29,7 @@ def _anual(linhas, campos):
 
 
 def projetar_ano(meses, historico, *, ano=2026, anexo_servicos='III', servicos_fator_r=False,
-                 saldos_irpj=None, saldos_csll=None, ajustes=None, confirmado=False):
+                 saldos_irpj=None, saldos_csll=None, ajustes=None, confirmado=False, distribuicoes=None):
     """12 meses projetados + 12 meses históricos anteriores ao ano.
 
     O histórico contém receita total e FS legal de cada mês anterior. Custos
@@ -114,15 +114,28 @@ def projetar_ano(meses, historico, *, ano=2026, anexo_servicos='III', servicos_f
             saldo_ir = saldo_cs = None
             saldos_validos = False
         lr.append(registro)
-    return {'ano': ano, 'status': 'parcial', 'regras': snapshot,
-            'simples': {'mensal': sn, 'anual': _anual(sn, ('das',))},
-            'presumido': {'trimestral': lp, 'anual': _anual(lp, ('irpj', 'csll'))},
-            'real': {'trimestral': lr, 'anual': _anual(lr, ('irpj', 'csll'))},
+    from cenario import ir_dividendos_cenario
+    div_meses=[]
+    for mes in range(1,13):
+        try:
+            div=ir_dividendos_cenario(distribuicoes,ano=ano,mes=mes)
+            div_meses.append(dict(mes=mes,irrf=div['irrf']))
+        except Pendente as exc:div_meses.append(dict(mes=mes,irrf=None,pendencia=str(exc)))
+    div_anual=sum((x['irrf'] for x in div_meses),ZERO) if all(x['irrf'] is not None for x in div_meses) else None
+    anuais={'simples':_anual(sn,('das',)),'presumido':_anual(lp,('irpj','csll')),'real':_anual(lr,('irpj','csll'))}
+    for chave,valores in anuais.items():
+        valores['irrf_dividendos']=div_anual
+        subtotal=valores.get('das') if chave=='simples' else valores['irpj']+valores['csll'] if valores['cobertura_completa'] else None
+        valores['subtotal_componentes_e_dividendos']=subtotal+div_anual if subtotal is not None and div_anual is not None else None
+    return {'ano': ano, 'status': 'parcial', 'regras': snapshot,'dividendos':{'mensal':div_meses,'irrf_anual':div_anual},
+            'simples': {'mensal': sn, 'anual': anuais['simples']},
+            'presumido': {'trimestral': lp, 'anual': anuais['presumido']},
+            'real': {'trimestral': lr, 'anual': anuais['real']},
             'financeiro': financeiro, 'receita_anual': sum(atual_receita, ZERO),
             'custos_despesas_anuais': sum(despesas, ZERO),
             'fundamento': 'Apuração mensal do DAS e trimestral de IRPJ/CSLL; fundamentos e regras incluídos na fotografia normativa.',
             'pendencias': ['Totais representam componentes diferentes: DAS versus IRPJ/CSLL. Não classificar o melhor regime com esses subtotais.',
-                          'Tributos sobre consumo, folha, dividendos e ajuste anual dos sócios não integram estes totais.',
+                          'IRRF mensal dos dividendos é apresentado separadamente e somado ao subtotal consolidado quando informado. Consumo, folha e ajuste anual dos sócios não estão integralmente contemplados.',
                           'Saldos gerenciais são anteriores aos tributos; não equivalem a lucro distribuível ou fluxo de caixa.',
                           'Real trimestral: sem estimativas mensais ou compensação retroativa; exceções à trava geral exigem revisão.',
                           'Presumido: sem aproveitamento de sobras de limites; fechamento com majoração permanece pendente.',
