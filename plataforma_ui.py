@@ -12,6 +12,7 @@ from cadastros import listar_empresas,salvar_empresa,importar_lancamentos,conect
 from importacoes import texto_pdf,extrair_cartao,extrair_qsa,ler_lancamentos,ImportacaoInvalida
 from cenario import comparar,ir_dividendos_cenario,simples_primeiro_mes
 from relatorios import html_relatorio,pdf_relatorio
+from tema import aplicar_tema
 from tax_engine import Pendente,moeda,numero,faixa_simples,FONTES
 
 BASE=Path(__file__).resolve().parent
@@ -25,7 +26,7 @@ def dinheiro(v):
 
 
 def iniciar(preservar_widgets=False):
-    padrao={'sc_empresa':'Empresa do planejamento','sc_situacao':'Vai começar agora','sc_atividade':'Comércio',
+    padrao={'sc_dark':False,'sc_empresa':'Empresa do planejamento','sc_situacao':'Vai começar agora','sc_atividade':'Comércio',
         'sc_receita':50000.0,'sc_custos':15000.0,'sc_salarios':8000.0,'sc_prolabore':3000.0,
         'sc_comercio':0.0,'sc_industria':0.0,'sc_servicos':0.0,
         'sc_encargos_fs':0.0,'sc_mes':1,'sc_ano':2026,'sc_anexo':'III','sc_fator':False,
@@ -395,13 +396,7 @@ def renderizar():
     iniciar(preservar_widgets=True)
     if '_empresa_selecionar' in st.session_state:
         st.session_state.empresa_ativa_nova=st.session_state.pop('_empresa_selecionar')
-    st.markdown('''<style>
-    .stApp{background:#f4f5f7} [data-testid="stSidebar"]{background:#fff;border-right:1px solid #dbe3e7}
-    .block-container{max-width:1250px;padding-top:2rem} h1{font-size:1.9rem!important;color:#16303a} h2,h3{color:#16303a}
-    div[data-testid="stMetric"]{padding:8px 0} [data-testid="stMetricValue"]{font-size:1.45rem}
-    [data-testid="stVerticalBlockBorderWrapper"]{background:white;border-radius:12px}
-    button[kind="primary"]{background:#16303a;border-color:#16303a}button{border-radius:7px!important}
-    </style>''',unsafe_allow_html=True)
+    aplicar_tema()
     if st.session_state.menu_principal!='Ferramentas originais' and LOGO.exists():st.sidebar.image(str(LOGO),width=155)
     st.sidebar.caption('MAXSUEL · PLANEJAMENTO E GESTÃO')
     empresas=listar_empresas(DB);mapa={e['id']:e for e in empresas}
@@ -456,3 +451,4 @@ def renderizar():
     else:
         from planejamento_ui import renderizar as tecnico
         tecnico()
+
